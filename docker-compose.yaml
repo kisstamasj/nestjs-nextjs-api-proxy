@@ -5,7 +5,7 @@ services:
     image: postgres:15
     container_name: health-app-postgres
     environment:
-      POSTGRES_DB: health_app
+      POSTGRES_DB: health_app_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
     ports:
