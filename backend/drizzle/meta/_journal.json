@@ -8,6 +8,34 @@
       "when": 1762552026959,
       "tag": "0000_stiff_mantis",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1762808485897,
+      "tag": "0001_dizzy_shen",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1762810078225,
+      "tag": "0002_solid_killraven",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1762811741843,
+      "tag": "0003_chilly_maginty",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1762814143029,
+      "tag": "0004_rich_madame_hydra",
+      "breakpoints": true
     }
   ]
 }

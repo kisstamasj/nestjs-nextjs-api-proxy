@@ -1,4 +1,37 @@
+import {
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import { User, users } from 'src/users/users.schema';
 import z from 'zod';
+
+export const tokens = pgTable(
+  'tokens',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    accessToken: text('access_token').notNull(),
+    refreshToken: text('refresh_token').notNull(),
+    userAgent: text('user_agent').notNull(),
+    ipAddress: text('ip_address').notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: 'tokens_pk',
+      columns: [table.userId, table.refreshToken],
+    }),
+  ],
+);
+
+export type RequestUser = User & {
+  refreshToken?: string;
+};
 
 export const SignUpSchema = z
   .object({

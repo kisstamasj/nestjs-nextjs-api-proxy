@@ -1,0 +1,1 @@
+ALTER TABLE "tokens" ALTER COLUMN "refresh_token" SET DATA TYPE text;

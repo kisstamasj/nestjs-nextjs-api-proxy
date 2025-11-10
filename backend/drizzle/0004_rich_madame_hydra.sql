@@ -1,0 +1,1 @@
+ALTER TABLE "tokens" ADD COLUMN "access_token" text NOT NULL;
