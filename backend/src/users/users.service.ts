@@ -21,18 +21,14 @@ export class UsersService {
   async createUser(
     data: CreateUserDto,
   ): Promise<Omit<schema.User, 'password'>> {
-    const emailExists = await this.drizzle.db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.email, data.email))
-      .limit(1)
-      .execute();
+    const emailExists = await this.findUserByEmail(data.email);
 
-    if (emailExists.length > 0) {
+    if (emailExists) {
       throw new ConflictException('Email already exists');
     }
 
     const passwordHash = await argon2.hash(data.password);
+
     const [user] = await this.drizzle.db
       .insert(schema.users)
       .values({
@@ -42,12 +38,13 @@ export class UsersService {
         lastName: data.lastName,
       })
       .returning(publicUserFields);
+
     return user;
   }
 
-  async getUserById(id: string): Promise<Omit<schema.User, 'password'> | null> {
+  async findUserById(id: string): Promise<schema.User | null> {
     const [user] = await this.drizzle.db
-      .select(publicUserFields)
+      .select()
       .from(schema.users)
       .where(eq(schema.users.id, id));
 
@@ -58,11 +55,20 @@ export class UsersService {
     return user;
   }
 
+  async findUserByEmail(email: string): Promise<schema.User | null> {
+    const [user] = await this.drizzle.db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email));
+
+    return user || null;
+  }
+
   async updateUser(
     id: string,
     data: any,
   ): Promise<Omit<schema.User, 'password'> | null> {
-    const user = await this.getUserById(id);
+    const user = await this.findUserById(id);
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -75,7 +81,7 @@ export class UsersService {
   }
 
   async deleteUser(id: string): Promise<void> {
-    const user = await this.getUserById(id);
+    const user = await this.findUserById(id);
     if (!user) {
       throw new NotFoundException('User not found');
     }
