@@ -33,7 +33,7 @@ export type RequestUser = User & {
   refreshToken?: string;
 };
 
-export const SignUpSchema = z
+export const signUpSchema = z
   .object({
     email: z.string().email().max(255),
     firstName: z.string().min(1).max(100),
