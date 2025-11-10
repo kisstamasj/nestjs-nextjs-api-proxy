@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -44,6 +45,12 @@ export class AuthController {
     });
 
     return user;
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('profile')
+  getProfile(@Req() req: RequestWithUser) {
+    return req.user;
   }
 
   @UseGuards(AuthGuard('jwt'))
