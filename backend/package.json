@@ -22,7 +22,8 @@
     "drizzle:push": "drizzle-kit push --config ./drizzle.config.ts",
     "drizzle:reset": "drizzle-kit reset --config ./drizzle.config.ts",
     "drizzle:status": "drizzle-kit status --config ./drizzle.config.ts",
-    "drizzle:migrate": "drizzle-kit migrate --config ./drizzle.config.ts"
+    "drizzle:migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
+    "drizzle:studio": "drizzle-kit studio --config ./drizzle.config.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.8",
