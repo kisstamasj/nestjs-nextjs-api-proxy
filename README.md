@@ -8,7 +8,12 @@ A modern health application built with NestJS, PostgreSQL, and Drizzle ORM. This
 - **Database**: [PostgreSQL](https://www.postgresql.org/) 15 - Reliable and powerful database
 - **ORM**: [Drizzle ORM](https://orm.drizzle.team/) v0.44.7 - TypeScript-first ORM with excellent developer experience
 - **Validation**: [Zod](https://zod.dev/) v4.1.12 - TypeScript-first schema validation
-- **Authentication**: [Argon2](https://github.com/ranisalt/node-argon2) v0.44.0 - Secure password hashing
+- **Authentication**: 
+  - [Passport](https://www.passportjs.org/) v0.7.0 - Authentication middleware
+  - [NestJS JWT](https://docs.nestjs.com/security/authentication) v11.0.1 - JWT token management
+  - [NestJS Passport](https://docs.nestjs.com/recipes/passport) v11.0.5 - Passport integration
+  - [Argon2](https://github.com/ranisalt/node-argon2) v0.44.0 - Secure password hashing
+  - [Cookie Parser](https://github.com/expressjs/cookie-parser) v1.4.7 - Cookie parsing middleware
 - **Runtime**: [Node.js](https://nodejs.org/) - JavaScript runtime
 - **Package Manager**: [pnpm](https://pnpm.io/) - Fast, disk space efficient package manager
 - **Containerization**: [Docker](https://www.docker.com/) - For easy development and deployment
@@ -18,16 +23,25 @@ A modern health application built with NestJS, PostgreSQL, and Drizzle ORM. This
 
 ### ✅ Implemented Features
 - **User Management**: Full CRUD operations for user entities
+- **Authentication & Authorization**: Complete JWT-based auth system with refresh tokens
+  - JWT Access & Refresh token strategy
+  - Cookie-based token storage with security headers
+  - Token rotation and automatic refresh
+  - Local strategy for login with email/password
+  - Protected routes with Passport guards
 - **Database Schema**: PostgreSQL with Drizzle ORM integration
 - **Validation**: Comprehensive input validation with Zod schemas
-- **Security**: Argon2 password hashing for secure authentication
+- **Security**: 
+  - Argon2 password hashing for secure authentication
+  - CORS configuration with credentials support
+  - HTTP-only cookies for token storage
+  - Secure cookie settings for production
 - **Type Safety**: End-to-end TypeScript with database type inference
 - **Testing**: Unit and E2E test setup with Jest
 - **Development**: Hot reload development server with clean output
 - **Docker**: PostgreSQL containerization for easy development
 
 ### 🚧 Upcoming Features
-- Authentication & Authorization (JWT/Sessions)
 - Health data models and tracking
 - API rate limiting and security middleware
 - Swagger/OpenAPI documentation
@@ -67,7 +81,19 @@ Make sure you have the following installed:
 4. **Set up environment variables**
    Create a `.env` file in the `backend` directory:
    ```env
+   # Database Configuration
    DATABASE_URL=postgresql://postgres:password@localhost:5433/health_app_db
+   
+   # JWT Configuration
+   JWT_ACCESS_TOKEN_SECRET=your-super-secret-access-token-key-here
+   JWT_REFRESH_TOKEN_SECRET=your-super-secret-refresh-token-key-here
+   JWT_ACCESS_TOKEN_EXPIRATION_TIME=900    # 15 minutes in seconds
+   JWT_REFRESH_TOKEN_EXPIRATION_TIME=604800 # 7 days in seconds
+   
+   # Application Configuration
+   NODE_ENV=development
+   PORT=5000
+   FRONTEND_URL=http://localhost:3000
    ```
 
 5. **Run database migrations**
@@ -80,7 +106,7 @@ Make sure you have the following installed:
    pnpm start:dev
    ```
 
-The API will be available at `http://localhost:3000`.
+The API will be available at `http://localhost:5000`.
 
 > **Note**: The development server runs with `--no-deprecation` flag to suppress Node.js deprecation warnings for a cleaner development experience.
 
@@ -97,6 +123,17 @@ health-app/
     │   ├── database/       # Drizzle database configuration & service
     │   │   ├── drizzle.module.ts
     │   │   └── drizzle.service.ts
+    │   ├── auth/           # Authentication module
+    │   │   ├── auth.controller.ts     # Auth REST API endpoints  
+    │   │   ├── auth.service.ts        # Authentication business logic
+    │   │   ├── auth.module.ts         # Auth module configuration
+    │   │   ├── auth.schema.ts         # Auth database schema & validation
+    │   │   ├── dto/                   # Auth data transfer objects
+    │   │   │   └── signup.dto.ts
+    │   │   └── strategies/            # Passport authentication strategies
+    │   │       ├── local.strategy.ts   # Email/password login strategy
+    │   │       ├── jwt-access.strategy.ts # JWT access token strategy
+    │   │       └── jwt-refresh.strategy.ts # JWT refresh token strategy
     │   └── users/          # User management module
     │       ├── users.controller.ts    # REST API endpoints
     │       ├── users.service.ts       # Business logic
@@ -161,6 +198,11 @@ Current database includes:
   - Unique email constraint
   - Password hashing with Argon2
   - Created/Updated timestamps
+- **Tokens Table**: JWT refresh token management and session tracking
+  - User association with foreign key
+  - Refresh token storage with rotation support
+  - User agent and IP address tracking for security
+  - Automatic cleanup and token rotation
 
 ### Database Management
 
@@ -197,14 +239,65 @@ Create a `.env` file in the backend directory with the following variables:
 # Database Configuration
 DATABASE_URL=postgresql://postgres:password@localhost:5433/health_app_db
 
+# JWT Configuration - IMPORTANT: Use strong, unique secrets in production!
+JWT_ACCESS_TOKEN_SECRET=your-super-secret-access-token-key-here-min-32-chars
+JWT_REFRESH_TOKEN_SECRET=your-super-secret-refresh-token-key-here-min-32-chars
+JWT_ACCESS_TOKEN_EXPIRATION_TIME=900     # 15 minutes in seconds
+JWT_REFRESH_TOKEN_EXPIRATION_TIME=604800 # 7 days in seconds
+
 # Application Configuration  
 NODE_ENV=development
-PORT=3000
+PORT=5000
+FRONTEND_URL=http://localhost:3000
 
-# Add other environment-specific variables here as the project grows
+# Security Note: Generate strong secrets using:
+# node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
 The application uses NestJS Config module for environment management with validation and type safety.
+
+## 🔐 Authentication & Security
+
+### JWT Token Strategy
+
+The application implements a dual-token JWT authentication system:
+
+- **Access Token**: Short-lived (15 minutes) for API access
+- **Refresh Token**: Long-lived (7 days) for token renewal
+- **Cookie Storage**: HTTP-only cookies prevent XSS attacks
+- **Token Rotation**: Automatic refresh token rotation on each use
+
+### Security Configuration
+
+- **CORS**: Configured with credentials support for cookie-based auth
+- **Cookie Security**: HTTP-only, Secure (production), SameSite strict
+- **Password Hashing**: Argon2 with automatic salt generation
+- **Token Secrets**: Environment-based JWT secrets (min 32 characters)
+- **Route Protection**: Passport guards on protected endpoints
+
+### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant DB
+
+    Client->>API: POST /auth/signin (email, password)
+    API->>DB: Validate user credentials
+    DB-->>API: User data (if valid)
+    API->>DB: Store refresh token
+    API-->>Client: Set HTTP-only cookies (access + refresh)
+    
+    Client->>API: GET /auth/profile (with cookies)
+    API->>API: Validate access token
+    API-->>Client: User profile data
+    
+    Note over Client,API: Access token expires
+    Client->>API: POST /auth/refresh (with refresh cookie)
+    API->>DB: Validate & rotate refresh token
+    API-->>Client: New tokens via cookies
+```
 
 ## 🧪 Testing
 
@@ -224,21 +317,31 @@ The project includes comprehensive testing setup with Jest v30:
 
 ## 📝 API Documentation
 
-The API follows RESTful conventions with comprehensive validation and type safety.
+The API follows RESTful conventions with comprehensive validation, type safety, and JWT-based authentication.
+
+### Authentication API Endpoints
+
+| Method | Endpoint | Description | Request Body | Authentication |
+|--------|----------|-------------|--------------|---------------|
+| `POST` | `/auth/signup` | Register new user | `SignUpDto` | None |
+| `POST` | `/auth/signin` | Login user | `{ email, password }` | None |
+| `POST` | `/auth/refresh` | Refresh access token | None | Refresh Token |
+| `GET` | `/auth/profile` | Get current user profile | None | Access Token |
+| `POST` | `/auth/logout` | Logout user | None | Access Token |
 
 ### Users API Endpoints
 
-| Method | Endpoint | Description | Request Body |
-|--------|----------|-------------|--------------|
-| `GET` | `/users` | Get all users | None |
-| `POST` | `/users` | Create new user | `CreateUserDto` |
-| `GET` | `/users/:id` | Get user by UUID | None |
-| `PATCH` | `/users/:id` | Update user | `UpdateUserDto` |
-| `DELETE` | `/users/:id` | Delete user | None |
+| Method | Endpoint | Description | Request Body | Authentication |
+|--------|----------|-------------|--------------|---------------|
+| `GET` | `/users` | Get all users | None | Access Token |
+| `POST` | `/users` | Create new user | `CreateUserDto` | Access Token |
+| `GET` | `/users/:id` | Get user by UUID | None | Access Token |
+| `PATCH` | `/users/:id` | Update user | `UpdateUserDto` | Access Token |
+| `DELETE` | `/users/:id` | Delete user | None | Access Token |
 
 ### Request/Response Models
 
-**CreateUserDto:**
+**SignUpDto:**
 ```typescript
 {
   email: string (email format, max 255 chars)
@@ -248,18 +351,41 @@ The API follows RESTful conventions with comprehensive validation and type safet
 }
 ```
 
+**CreateUserDto:** Same as SignUpDto
+
 **UpdateUserDto:** All fields optional from CreateUserDto
+
+**Login Request:**
+```typescript
+{
+  email: string
+  password: string
+}
+```
 
 **User Response:** All user fields except password (secure by default)
 
-### Features
-- ✅ UUID-based user identification
-- ✅ Email uniqueness validation
-- ✅ Secure password hashing with Argon2
-- ✅ Input validation with Zod schemas
-- ✅ Type-safe database operations
-- ✅ Comprehensive error handling
-- ✅ Automatic timestamps (created/updated)
+### Authentication Flow
+
+1. **Registration**: `POST /auth/signup` with user details
+2. **Login**: `POST /auth/signin` returns user data + sets HTTP-only cookies
+3. **Protected Routes**: Access token automatically sent via cookies
+4. **Token Refresh**: Automatic refresh when access token expires
+5. **Logout**: `POST /auth/logout` clears cookies and invalidates refresh token
+
+### Security Features
+- ✅ **Authentication**: Complete JWT-based authentication system
+- ✅ **Authorization**: Route-level protection with Passport guards  
+- ✅ **Token Management**: Access + Refresh token rotation strategy
+- ✅ **Cookie Security**: HTTP-only, Secure, SameSite strict cookies
+- ✅ **Password Security**: Argon2 hashing with salt
+- ✅ **Session Tracking**: User agent and IP tracking for security
+- ✅ **CORS Protection**: Configurable CORS with credentials support
+- ✅ **Input Validation**: Comprehensive validation with Zod schemas
+- ✅ **Type Safety**: End-to-end TypeScript type safety
+- ✅ **UUID Identification**: UUID-based user identification
+- ✅ **Email Uniqueness**: Database-level email constraint
+- ✅ **Error Handling**: Secure error responses without data leaks
 
 ## 🤝 Contributing
 
@@ -277,6 +403,8 @@ This project is licensed under the UNLICENSED license.
 
 ### Framework Documentation
 - [NestJS Documentation](https://docs.nestjs.com/) - Backend framework
+- [NestJS Authentication](https://docs.nestjs.com/security/authentication) - JWT & Passport integration
+- [Passport.js Documentation](https://www.passportjs.org/docs/) - Authentication strategies
 - [Drizzle ORM Documentation](https://orm.drizzle.team/) - Database ORM
 - [Zod Documentation](https://zod.dev/) - Schema validation
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/) - Database
