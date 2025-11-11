@@ -1,0 +1,282 @@
+### Variables
+@baseUrl = http://localhost:5000
+@userId = {{createUser.response.body.id}}
+@secondUserId = {{createSecondUser.response.body.id}}
+
+### =================================
+### BASIC CRUD OPERATIONS
+### =================================
+
+### Get all users
+GET {{baseUrl}}/users
+Content-Type: application/json
+
+### Create a new user
+# @name createUser
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "firstName": "John",
+  "lastName": "Doe",
+  "password": "password123"
+}
+
+### Create a second user for testing
+# @name createSecondUser
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "jane.smith@example.com",
+  "firstName": "Jane",
+  "lastName": "Smith",
+  "password": "securePass456"
+}
+
+### Get user by ID (using the created user ID)
+GET {{baseUrl}}/users/{{createUser.response.body.id}}
+Content-Type: application/json
+
+### Update user (partial update)
+PATCH {{baseUrl}}/users/{{createUser.response.body.id}}
+Content-Type: application/json
+
+{
+  "firstName": "Johnny"
+}
+
+### Update user (multiple fields)
+PATCH {{baseUrl}}/users/{{createUser.response.body.id}}
+Content-Type: application/json
+
+{
+  "firstName": "Jonathan",
+  "lastName": "Doe-Smith",
+  "email": "jonathan.doe.smith@example.com"
+}
+
+### Update user password
+PATCH {{baseUrl}}/users/{{createUser.response.body.id}}
+Content-Type: application/json
+
+{
+  "password": "newSecurePassword789"
+}
+
+### Get updated user to verify changes
+GET {{baseUrl}}/users/{{createUser.response.body.id}}
+Content-Type: application/json
+
+### Delete the second user
+DELETE {{baseUrl}}/users/{{createSecondUser.response.body.id}}
+Content-Type: application/json
+
+### Verify user was deleted (should return 404)
+GET {{baseUrl}}/users/{{createSecondUser.response.body.id}}
+Content-Type: application/json
+
+### =================================
+### ERROR SCENARIOS
+### =================================
+
+### Try to create user with duplicate email
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "firstName": "Another",
+  "lastName": "User",
+  "password": "password123"
+}
+
+### Try to get non-existent user
+GET {{baseUrl}}/users/00000000-0000-0000-0000-000000000000
+Content-Type: application/json
+
+### Try to get user with invalid UUID format
+GET {{baseUrl}}/users/invalid-uuid-format
+Content-Type: application/json
+
+### Try to update non-existent user
+PATCH {{baseUrl}}/users/00000000-0000-0000-0000-000000000000
+Content-Type: application/json
+
+{
+  "firstName": "Test"
+}
+
+### Try to delete non-existent user
+DELETE {{baseUrl}}/users/00000000-0000-0000-0000-000000000000
+Content-Type: application/json
+
+### =================================
+### VALIDATION ERROR SCENARIOS
+### =================================
+
+### Invalid email format
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "not-an-email",
+  "firstName": "Test",
+  "lastName": "User",
+  "password": "password123"
+}
+
+### Missing required fields
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}
+
+### Empty required fields
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "firstName": "",
+  "lastName": "",
+  "password": ""
+}
+
+### Password too short
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "firstName": "Test",
+  "lastName": "User",
+  "password": "123"
+}
+
+### Password too long (over 100 characters)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "firstName": "Test",
+  "lastName": "User",
+  "password": "this-is-a-very-long-password-that-exceeds-the-maximum-allowed-length-of-100-characters-and-should-fail-validation-because-it-is-too-long"
+}
+
+### Email too long (over 255 characters)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "this-is-a-very-long-email-address-that-exceeds-the-maximum-allowed-length-of-255-characters-and-should-fail-validation-because-it-is-too-long-for-the-database-field-which-has-a-limit-of-255-characters@example.com",
+  "firstName": "Test",
+  "lastName": "User",
+  "password": "password123"
+}
+
+### First name too long (over 100 characters)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "firstName": "this-is-a-very-long-first-name-that-exceeds-the-maximum-allowed-length-of-100-characters",
+  "lastName": "User",
+  "password": "password123"
+}
+
+### Last name too long (over 100 characters)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "firstName": "Test",
+  "lastName": "this-is-a-very-long-last-name-that-exceeds-the-maximum-allowed-length-of-100-characters",
+  "password": "password123"
+}
+
+### =================================
+### UPDATE VALIDATION SCENARIOS
+### =================================
+
+### Update with invalid email format
+PATCH {{baseUrl}}/users/{{createUser.response.body.id}}
+Content-Type: application/json
+
+{
+  "email": "invalid-email-format"
+}
+
+### Update with duplicate email (create test user first)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "test.duplicate@example.com",
+  "firstName": "Test",
+  "lastName": "Duplicate",
+  "password": "password123"
+}
+
+### Try to update first user with the duplicate email
+PATCH {{baseUrl}}/users/{{createUser.response.body.id}}
+Content-Type: application/json
+
+{
+  "email": "test.duplicate@example.com"
+}
+
+### =================================
+### EDGE CASES AND SPECIAL CHARACTERS
+### =================================
+
+### Create user with special characters in name
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "special.chars@example.com",
+  "firstName": "José-María",
+  "lastName": "O'Connor-Smith",
+  "password": "password123"
+}
+
+### Create user with unicode characters
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "unicode@example.com",
+  "firstName": "测试",
+  "lastName": "用户",
+  "password": "password123"
+}
+
+### Create user with minimum valid values
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "email": "a@b.co",
+  "firstName": "A",
+  "lastName": "B",
+  "password": "1234"
+}
+
+### =================================
+### CLEANUP
+### =================================
+
+### Clean up - Delete the main test user
+DELETE {{baseUrl}}/users/{{createUser.response.body.id}}
+Content-Type: application/json
+
+### Verify all users after cleanup
+GET {{baseUrl}}/users
+Content-Type: application/json
