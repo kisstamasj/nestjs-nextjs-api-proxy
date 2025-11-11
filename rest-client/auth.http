@@ -1,0 +1,396 @@
+### Variables
+@baseUrl = http://localhost:5000
+@email = test.user@example.com
+@password = securePassword123
+@firstName = Test
+@lastName = User
+
+### =================================
+### AUTHENTICATION FLOW
+### =================================
+
+### Sign up a new user
+# @name signUp
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "firstName": "{{firstName}}",
+  "lastName": "{{lastName}}",
+  "password": "{{password}}",
+  "passwordConfirm": "{{password}}"
+}
+
+### Sign in with the created user
+# @name signIn
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Get user profile (requires authentication via cookies from signin)
+GET {{baseUrl}}/auth/profile
+Content-Type: application/json
+
+### Refresh tokens (uses refresh token from signin)
+# @name refreshTokens
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+### Get profile again after refresh
+GET {{baseUrl}}/auth/profile
+Content-Type: application/json
+
+### Logout (invalidates refresh token)
+POST {{baseUrl}}/auth/logout
+Content-Type: application/json
+
+### Try to get profile after logout (should fail)
+GET {{baseUrl}}/auth/profile
+Content-Type: application/json
+
+### =================================
+### ADDITIONAL TEST USERS
+### =================================
+
+### Sign up second user for testing
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "jane.doe@example.com",
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "password": "anotherSecurePass456",
+  "passwordConfirm": "anotherSecurePass456"
+}
+
+### Sign up third user for testing
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "bob.smith@example.com",
+  "firstName": "Bob",
+  "lastName": "Smith",
+  "password": "bobsPassword789",
+  "passwordConfirm": "bobsPassword789"
+}
+
+### =================================
+### SIGN IN VARIATIONS
+### =================================
+
+### Sign in with different user
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "jane.doe@example.com",
+  "password": "anotherSecurePass456"
+}
+
+### Sign in with custom User-Agent header
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+User-Agent: Mozilla/5.0 (Custom Test Browser)
+
+{
+  "email": "bob.smith@example.com",
+  "password": "bobsPassword789"
+}
+
+### =================================
+### ERROR SCENARIOS - SIGNUP
+### =================================
+
+### Try to sign up with existing email
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "firstName": "Another",
+  "lastName": "User",
+  "password": "password123",
+  "passwordConfirm": "password123"
+}
+
+### Sign up with mismatched passwords
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "mismatch@example.com",
+  "firstName": "Test",
+  "lastName": "User",
+  "password": "password123",
+  "passwordConfirm": "differentPassword"
+}
+
+### Sign up with invalid email format
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "invalid-email-format",
+  "firstName": "Test",
+  "lastName": "User",
+  "password": "password123",
+  "passwordConfirm": "password123"
+}
+
+### Sign up with missing required fields
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "incomplete@example.com",
+  "firstName": "Test"
+}
+
+### Sign up with empty fields
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "",
+  "firstName": "",
+  "lastName": "",
+  "password": "",
+  "passwordConfirm": ""
+}
+
+### Sign up with short password (less than 4 characters)
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "short.password@example.com",
+  "firstName": "Test",
+  "lastName": "User",
+  "password": "123",
+  "passwordConfirm": "123"
+}
+
+### Sign up with long password (over 100 characters)
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "long.password@example.com",
+  "firstName": "Test",
+  "lastName": "User",
+  "password": "this-is-a-very-long-password-that-exceeds-the-maximum-allowed-length-of-100-characters-and-should-fail-validation-because-it-is-too-long-for-the-schema",
+  "passwordConfirm": "this-is-a-very-long-password-that-exceeds-the-maximum-allowed-length-of-100-characters-and-should-fail-validation-because-it-is-too-long-for-the-schema"
+}
+
+### Sign up with long email (over 255 characters)
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "this-is-a-very-long-email-address-that-exceeds-the-maximum-allowed-length-of-255-characters-and-should-fail-validation-because-it-is-too-long-for-the-database-field-which-has-a-limit@example.com",
+  "firstName": "Test",
+  "lastName": "User",
+  "password": "password123",
+  "passwordConfirm": "password123"
+}
+
+### Sign up with long first name (over 100 characters)
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "long.firstname@example.com",
+  "firstName": "this-is-a-very-long-first-name-that-exceeds-the-maximum-allowed-length-of-100-characters",
+  "lastName": "User",
+  "password": "password123",
+  "passwordConfirm": "password123"
+}
+
+### Sign up with long last name (over 100 characters)
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "long.lastname@example.com",
+  "firstName": "Test",
+  "lastName": "this-is-a-very-long-last-name-that-exceeds-the-maximum-allowed-length-of-100-characters",
+  "password": "password123",
+  "passwordConfirm": "password123"
+}
+
+### =================================
+### ERROR SCENARIOS - SIGNIN
+### =================================
+
+### Sign in with wrong password
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "wrongPassword"
+}
+
+### Sign in with non-existent email
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "nonexistent@example.com",
+  "password": "password123"
+}
+
+### Sign in with empty credentials
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "",
+  "password": ""
+}
+
+### Sign in with missing password
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "{{email}}"
+}
+
+### Sign in with missing email
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "password": "{{password}}"
+}
+
+### Sign in with invalid JSON
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+  // This comma should cause a JSON parse error
+}
+
+### =================================
+### UNAUTHORIZED ACCESS SCENARIOS
+### =================================
+
+### Try to access profile without authentication
+GET {{baseUrl}}/auth/profile
+Content-Type: application/json
+
+### Try to refresh tokens without authentication
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+### Try to logout without authentication
+POST {{baseUrl}}/auth/logout
+Content-Type: application/json
+
+### =================================
+### SPECIAL CHARACTERS AND EDGE CASES
+### =================================
+
+### Sign up with special characters in names
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "special.chars@example.com",
+  "firstName": "José-María",
+  "lastName": "O'Connor-Smith",
+  "password": "specialPassword123!@#",
+  "passwordConfirm": "specialPassword123!@#"
+}
+
+### Sign up with unicode characters
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "unicode@example.com",
+  "firstName": "测试",
+  "lastName": "用户",
+  "password": "unicodePassword123",
+  "passwordConfirm": "unicodePassword123"
+}
+
+### Sign up with minimum valid values
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "min@b.co",
+  "firstName": "A",
+  "lastName": "B",
+  "password": "1234",
+  "passwordConfirm": "1234"
+}
+
+### Sign up with email containing plus sign (common email pattern)
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "user+test@example.com",
+  "firstName": "Plus",
+  "lastName": "User",
+  "password": "password123",
+  "passwordConfirm": "password123"
+}
+
+### =================================
+### MULTIPLE SESSION TESTING
+### =================================
+
+### Sign in with first user (will create session 1)
+POST {{baseUrl}}/auth/signin
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### Get profile for session 1
+GET {{baseUrl}}/auth/profile
+Content-Type: application/json
+
+### Refresh tokens for session 1
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+### =================================
+### SESSION MANAGEMENT
+### =================================
+
+### Test multiple refresh calls (should update the same token)
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+### Another refresh call
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+### Get profile after multiple refreshes
+GET {{baseUrl}}/auth/profile
+Content-Type: application/json
+
+### Final logout
+POST {{baseUrl}}/auth/logout
+Content-Type: application/json
+
+### Verify logout worked (should fail)
+GET {{baseUrl}}/auth/profile
+Content-Type: application/json
