@@ -49,8 +49,6 @@ export class JwtAccessStrategy extends PassportStrategy(
       throw new UnauthorizedException('Access token not found in database');
     }
 
-    const { password, ...result } = user;
-
-    return result;
+    return user;
   }
 }

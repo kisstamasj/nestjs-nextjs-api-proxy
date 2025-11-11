@@ -42,9 +42,9 @@ export class UsersService {
     return user;
   }
 
-  async findUserById(id: string): Promise<schema.User | null> {
+  async findUserById(id: string): Promise<Omit<schema.User, 'password'> | null> {
     const [user] = await this.drizzle.db
-      .select()
+      .select(publicUserFields)
       .from(schema.users)
       .where(eq(schema.users.id, id));
 
@@ -72,6 +72,15 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+
+    const passwordHash = data.password
+      ? await argon2.hash(data.password)
+      : undefined;
+
+    if (passwordHash) {
+      data.password = passwordHash;
+    }
+
     const [updatedUser] = await this.drizzle.db
       .update(schema.users)
       .set(data)

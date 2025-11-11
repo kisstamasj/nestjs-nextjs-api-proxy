@@ -53,10 +53,8 @@ export class JwtRefreshStrategy extends PassportStrategy(
       throw new UnauthorizedException('Refresh token not found in database');
     }
 
-    const { password, ...result } = user;
-
     return {
-      ...result,
+      ...user,
       refreshToken,
     };
   }
