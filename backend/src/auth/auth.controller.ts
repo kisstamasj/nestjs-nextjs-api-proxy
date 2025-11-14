@@ -119,7 +119,6 @@ export class AuthController {
 
     res.cookie('refresh_token', refreshToken, {
       ...cookieOptions,
-      path: '/auth/refresh', // Refresh token cookie only sent to /auth/refresh
       maxAge:
         parseInt(
           this.authService['configService'].get<string>(
