@@ -1,12 +1,13 @@
 "use client";
 
+import apiClient from "@/lib/apiClient";
 import { useForm } from "@tanstack/react-form";
+import { toast } from "sonner";
 import z from "zod";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Field, FieldError, FieldGroup, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
-import apiClient from "@/lib/apiClient";
 
 const signUpFormSchema = z
   .object({
@@ -36,9 +37,17 @@ export default function SignUpForm({
       onSubmit: signUpFormSchema,
     },
     onSubmit: async ({ value }) => {
-      console.log("Form submitted:", value);
-      const response = await apiClient.post("/auth/signup", value);
-      console.log("API response:", response.data);
+      const response = await apiClient
+        .post("/auth/signup", value)
+        .catch((error) => {
+          toast.error(
+            error.response?.data?.message ||
+              "An error occurred while creating the account."
+          );
+        });
+      if (response && response.status === 201) {
+        toast.success("Account created successfully! Please log in.");
+      }
     },
   });
 
