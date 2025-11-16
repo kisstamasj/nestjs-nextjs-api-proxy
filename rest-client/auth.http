@@ -1,3 +1,20 @@
+### Health App Authentication API Tests
+# This file contains comprehensive tests for the authentication endpoints
+#
+# AUTHENTICATION FLOW:
+# 1. sign-up: Creates a new user account
+# 2. sign-in: Authenticates user and returns accessToken + refreshToken
+# 3. profile: Access protected route using accessToken in Authorization header
+# 4. refresh: Get new tokens using refreshToken in Authorization header
+# 5. sign-out: Invalidates refresh token using accessToken
+#
+# TOKEN USAGE:
+# - Access Token: Short-lived, used for accessing protected endpoints (Authorization: Bearer {accessToken})
+# - Refresh Token: Longer-lived, used to get new access tokens (Authorization: Bearer {refreshToken})
+# - All tokens are returned in response body (not cookies)
+#
+# NOTE: Adjust the baseUrl port based on your backend configuration (check .env file)
+
 ### Variables
 @baseUrl = http://localhost:5000
 @email = test.user@example.com
@@ -11,7 +28,7 @@
 
 ### Sign up a new user
 # @name signUp
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -24,7 +41,7 @@ Content-Type: application/json
 
 ### Sign in with the created user
 # @name signIn
-POST {{baseUrl}}/auth/signin
+POST {{baseUrl}}/auth/sign-in
 Content-Type: application/json
 
 {
@@ -32,22 +49,26 @@ Content-Type: application/json
   "password": "{{password}}"
 }
 
-### Get user profile (requires authentication via cookies from signin)
+### Get user profile (requires JWT access token from sign-in response)
 GET {{baseUrl}}/auth/profile
 Content-Type: application/json
+Authorization: Bearer {{signIn.response.body.accessToken}}
 
-### Refresh tokens (uses refresh token from signin)
+### Refresh tokens (uses refresh token from sign-in response)
 # @name refreshTokens
 POST {{baseUrl}}/auth/refresh
 Content-Type: application/json
+Authorization: Bearer {{signIn.response.body.refreshToken}}
 
-### Get profile again after refresh
+### Get profile again after refresh (using new access token)
 GET {{baseUrl}}/auth/profile
 Content-Type: application/json
+Authorization: Bearer {{refreshTokens.response.body.accessToken}}
 
 ### Logout (invalidates refresh token)
-POST {{baseUrl}}/auth/logout
+POST {{baseUrl}}/auth/sign-out
 Content-Type: application/json
+Authorization: Bearer {{refreshTokens.response.body.accessToken}}
 
 ### Try to get profile after logout (should fail)
 GET {{baseUrl}}/auth/profile
@@ -58,7 +79,7 @@ Content-Type: application/json
 ### =================================
 
 ### Sign up second user for testing
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -70,7 +91,7 @@ Content-Type: application/json
 }
 
 ### Sign up third user for testing
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -86,7 +107,7 @@ Content-Type: application/json
 ### =================================
 
 ### Sign in with different user
-POST {{baseUrl}}/auth/signin
+POST {{baseUrl}}/auth/sign-in
 Content-Type: application/json
 
 {
@@ -95,7 +116,7 @@ Content-Type: application/json
 }
 
 ### Sign in with custom User-Agent header
-POST {{baseUrl}}/auth/signin
+POST {{baseUrl}}/auth/sign-in
 Content-Type: application/json
 User-Agent: Mozilla/5.0 (Custom Test Browser)
 
@@ -109,7 +130,7 @@ User-Agent: Mozilla/5.0 (Custom Test Browser)
 ### =================================
 
 ### Try to sign up with existing email
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -121,7 +142,7 @@ Content-Type: application/json
 }
 
 ### Sign up with mismatched passwords
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -133,7 +154,7 @@ Content-Type: application/json
 }
 
 ### Sign up with invalid email format
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -145,7 +166,7 @@ Content-Type: application/json
 }
 
 ### Sign up with missing required fields
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -154,7 +175,7 @@ Content-Type: application/json
 }
 
 ### Sign up with empty fields
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -166,7 +187,7 @@ Content-Type: application/json
 }
 
 ### Sign up with short password (less than 4 characters)
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -178,7 +199,7 @@ Content-Type: application/json
 }
 
 ### Sign up with long password (over 100 characters)
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -190,7 +211,7 @@ Content-Type: application/json
 }
 
 ### Sign up with long email (over 255 characters)
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -202,7 +223,7 @@ Content-Type: application/json
 }
 
 ### Sign up with long first name (over 100 characters)
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -214,7 +235,7 @@ Content-Type: application/json
 }
 
 ### Sign up with long last name (over 100 characters)
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -230,7 +251,7 @@ Content-Type: application/json
 ### =================================
 
 ### Sign in with wrong password
-POST {{baseUrl}}/auth/signin
+POST {{baseUrl}}/auth/sign-in
 Content-Type: application/json
 
 {
@@ -239,7 +260,7 @@ Content-Type: application/json
 }
 
 ### Sign in with non-existent email
-POST {{baseUrl}}/auth/signin
+POST {{baseUrl}}/auth/sign-in
 Content-Type: application/json
 
 {
@@ -248,7 +269,7 @@ Content-Type: application/json
 }
 
 ### Sign in with empty credentials
-POST {{baseUrl}}/auth/signin
+POST {{baseUrl}}/auth/sign-in
 Content-Type: application/json
 
 {
@@ -257,7 +278,7 @@ Content-Type: application/json
 }
 
 ### Sign in with missing password
-POST {{baseUrl}}/auth/signin
+POST {{baseUrl}}/auth/sign-in
 Content-Type: application/json
 
 {
@@ -265,7 +286,7 @@ Content-Type: application/json
 }
 
 ### Sign in with missing email
-POST {{baseUrl}}/auth/signin
+POST {{baseUrl}}/auth/sign-in
 Content-Type: application/json
 
 {
@@ -273,7 +294,7 @@ Content-Type: application/json
 }
 
 ### Sign in with invalid JSON
-POST {{baseUrl}}/auth/signin
+POST {{baseUrl}}/auth/sign-in
 Content-Type: application/json
 
 {
@@ -295,7 +316,7 @@ POST {{baseUrl}}/auth/refresh
 Content-Type: application/json
 
 ### Try to logout without authentication
-POST {{baseUrl}}/auth/logout
+POST {{baseUrl}}/auth/sign-out
 Content-Type: application/json
 
 ### =================================
@@ -303,7 +324,7 @@ Content-Type: application/json
 ### =================================
 
 ### Sign up with special characters in names
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -315,7 +336,7 @@ Content-Type: application/json
 }
 
 ### Sign up with unicode characters
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -327,7 +348,7 @@ Content-Type: application/json
 }
 
 ### Sign up with minimum valid values
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -339,7 +360,7 @@ Content-Type: application/json
 }
 
 ### Sign up with email containing plus sign (common email pattern)
-POST {{baseUrl}}/auth/signup
+POST {{baseUrl}}/auth/sign-up
 Content-Type: application/json
 
 {
@@ -355,7 +376,8 @@ Content-Type: application/json
 ### =================================
 
 ### Sign in with first user (will create session 1)
-POST {{baseUrl}}/auth/signin
+# @name multiSessionSignIn
+POST {{baseUrl}}/auth/sign-in
 Content-Type: application/json
 
 {
@@ -365,30 +387,40 @@ Content-Type: application/json
 
 ### Get profile for session 1
 GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{multiSessionSignIn.response.body.accessToken}}
 Content-Type: application/json
 
 ### Refresh tokens for session 1
+# @name sessionRefresh
 POST {{baseUrl}}/auth/refresh
 Content-Type: application/json
+Authorization: Bearer {{multiSessionSignIn.response.body.refreshToken}}
 
 ### =================================
 ### SESSION MANAGEMENT
 ### =================================
 
 ### Test multiple refresh calls (should update the same token)
+# @name multiRefresh1
 POST {{baseUrl}}/auth/refresh
 Content-Type: application/json
+Authorization: Bearer {{sessionRefresh.response.body.refreshToken}}
 
 ### Another refresh call
+# @name multiRefresh2
 POST {{baseUrl}}/auth/refresh
 Content-Type: application/json
+Authorization: Bearer {{multiRefresh1.response.body.refreshToken}}
 
 ### Get profile after multiple refreshes
 GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{multiRefresh2.response.body.accessToken}}
 Content-Type: application/json
 
 ### Final logout
-POST {{baseUrl}}/auth/logout
+POST {{baseUrl}}/auth/sign-out
+Content-Type: application/json
+Authorization: Bearer {{multiSessionSignIn.response.body.accessToken}}
 Content-Type: application/json
 
 ### Verify logout worked (should fail)
