@@ -31,6 +31,7 @@ export const tokens = pgTable(
 
 export type RequestUser = User & {
   refreshToken?: string;
+  accessToken?: string;
 };
 
 export const signUpSchema = z

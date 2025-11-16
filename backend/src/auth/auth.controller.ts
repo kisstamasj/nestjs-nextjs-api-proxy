@@ -79,11 +79,11 @@ export class AuthController {
 
   @UseGuards(AuthGuard('jwt-access'))
   @Post('sign-out')
-  async signOut(@Res({ passthrough: true }) res: Response) {
-    const refreshToken = res.req.cookies?.refresh_token;
+  async signOut(@Req() req: RequestWithUser) {
+    const accessToken = req.user.accessToken;
 
-    if (refreshToken) {
-      await this.authService.signOut(refreshToken);
+    if (accessToken) {
+      await this.authService.signOut(accessToken);
     }
 
     return { message: 'Successfully logged out.' };

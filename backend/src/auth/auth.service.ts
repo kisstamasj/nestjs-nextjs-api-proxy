@@ -105,10 +105,10 @@ export class AuthService {
     return token;
   }
 
-  async signOut(refreshToken: string): Promise<void> {
+  async signOut(accessToken: string): Promise<void> {
     await this.drizzle.db
       .delete(tokens)
-      .where(eq(tokens.refreshToken, refreshToken));
+      .where(eq(tokens.accessToken, accessToken));
   }
 
   async signAccessToken(user: RequestUser): Promise<string> {
