@@ -1,13 +1,8 @@
-// app/api/proxy/[...path]/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import {
-  ACCESS_TOKEN_COOKIE,
-  getAccessTokenOptions,
-  getRefreshTokenOptions,
-  REFRESH_TOKEN_COOKIE,
-} from "@/lib/token";
 import { BACKEND_API_URL } from "@/lib/config";
+import { decrypt, encrypt } from "@/lib/session";
+import { getSessionTokenOption, SESSION_TOKEN_COOKIE } from "@/lib/token";
+import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 const REFRESH_ENDPOINT = "/auth/refresh"; // Adjust to your refresh endpoint
 
 // Helper to get cookies from either request or server context
@@ -139,8 +134,10 @@ async function handleRequest(
   params: Promise<{ path: string[] }>
 ) {
   // Get cookies from either request or server context
-  let accessToken = await getCookieValue(ACCESS_TOKEN_COOKIE);
-  const refreshToken = await getCookieValue(REFRESH_TOKEN_COOKIE);
+  const sessionToken = await getCookieValue(SESSION_TOKEN_COOKIE);
+  const sessionPayload = sessionToken ? await decrypt(sessionToken) : undefined;
+  let accessToken = sessionPayload?.accessToken || undefined;
+  const refreshToken = sessionPayload?.refreshToken || undefined;
 
   const resolvedParams = await params;
   const pathSegments = resolvedParams?.path || [];
@@ -150,7 +147,7 @@ async function handleRequest(
   let response = await forwardRequest(request, fullPath, accessToken);
 
   // If unauthorized (401), try to refresh the token
-  if (response.status === 401 && refreshToken) {
+  if (response.status === 401 && sessionPayload && refreshToken) {
     const refreshResult = await refreshAccessToken(refreshToken);
 
     if (refreshResult) {
@@ -168,13 +165,13 @@ async function handleRequest(
         headers: response.headers,
       });
 
-      nextResponse.cookies.set(
-        getAccessTokenOptions(refreshResult.access_token)
-      );
+      const encryptedSession = await encrypt({
+        ...sessionPayload,
+        accessToken: refreshResult.access_token,
+        refreshToken: refreshResult.refresh_token,
+      });
 
-      nextResponse.cookies.set(
-        getRefreshTokenOptions(refreshResult.refresh_token)
-      );
+      nextResponse.cookies.set(getSessionTokenOption(encryptedSession));
 
       return nextResponse;
     } else {
@@ -184,9 +181,7 @@ async function handleRequest(
         { status: 401 }
       );
 
-      errorResponse.cookies.delete(ACCESS_TOKEN_COOKIE);
-      errorResponse.cookies.delete(REFRESH_TOKEN_COOKIE);
-
+      errorResponse.cookies.delete(SESSION_TOKEN_COOKIE);
       return errorResponse;
     }
   }
@@ -200,8 +195,7 @@ async function handleRequest(
       headers: response.headers,
     });
 
-    nextResponse.cookies.delete(ACCESS_TOKEN_COOKIE);
-    nextResponse.cookies.delete(REFRESH_TOKEN_COOKIE);
+    nextResponse.cookies.delete(SESSION_TOKEN_COOKIE);
 
     return nextResponse;
   }
