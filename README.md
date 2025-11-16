@@ -1,53 +1,93 @@
 # Health App
 
-A modern health application built with NestJS, PostgreSQL, and Drizzle ORM. This application provides a robust backend API for managing health-related data and user information.
+A modern full-stack health application with a NestJS backend API and Next.js frontend. This application provides a complete user management system with secure authentication, featuring a responsive web interface and robust REST API for managing health-related data and user information.
 
 ## 🏗️ Tech Stack
 
-- **Backend Framework**: [NestJS](https://nestjs.com/) v11.1.8 - A progressive Node.js framework
-- **Database**: [PostgreSQL](https://www.postgresql.org/) 15 - Reliable and powerful database
+### Backend
+- **Framework**: [NestJS](https://nestjs.com/) v11.1.8 - Progressive Node.js framework
+- **Database**: [PostgreSQL](https://www.postgresql.org/) 15 - Production-ready relational database
 - **ORM**: [Drizzle ORM](https://orm.drizzle.team/) v0.44.7 - TypeScript-first ORM with excellent developer experience
-- **Validation**: [Zod](https://zod.dev/) v4.1.12 - TypeScript-first schema validation
+- **Validation**: [Zod](https://zod.dev/) v4.1.12 - TypeScript-first schema validation with nestjs-zod integration
 - **Authentication**: 
   - [Passport](https://www.passportjs.org/) v0.7.0 - Authentication middleware
   - [NestJS JWT](https://docs.nestjs.com/security/authentication) v11.0.1 - JWT token management
   - [NestJS Passport](https://docs.nestjs.com/recipes/passport) v11.0.5 - Passport integration
   - [Argon2](https://github.com/ranisalt/node-argon2) v0.44.0 - Secure password hashing
   - [Cookie Parser](https://github.com/expressjs/cookie-parser) v1.4.7 - Cookie parsing middleware
-- **Runtime**: [Node.js](https://nodejs.org/) - JavaScript runtime
+
+### Frontend
+- **Framework**: [Next.js](https://nextjs.org/) v16.0.3 - React-based full-stack framework with App Router
+- **React**: [React](https://react.dev/) v19.2.0 - Modern React with latest features
+- **UI Components**: 
+  - [Radix UI](https://www.radix-ui.com/) - Unstyled, accessible UI primitives
+  - [Tailwind CSS](https://tailwindcss.com/) v4 - Utility-first CSS framework
+  - [Lucide React](https://lucide.dev/) - Beautiful & consistent icon toolkit
+- **Forms**: [TanStack Form](https://tanstack.com/form) v1.25.0 - Powerful form state management
+- **HTTP Client**: [Axios](https://axios-http.com/) v1.13.2 - Promise-based HTTP client
+- **Notifications**: [Sonner](https://sonner.emilkowal.ski/) v2.0.7 - Toast notifications
+- **Theming**: [Next Themes](https://github.com/pacocoursey/next-themes) v0.4.6 - Theme switching
+
+### Development & Infrastructure
+- **Runtime**: [Node.js](https://nodejs.org/) - JavaScript runtime environment
 - **Package Manager**: [pnpm](https://pnpm.io/) - Fast, disk space efficient package manager
-- **Containerization**: [Docker](https://www.docker.com/) - For easy development and deployment
+- **Containerization**: [Docker](https://www.docker.com/) - PostgreSQL database containerization
 - **Configuration**: [NestJS Config](https://docs.nestjs.com/techniques/configuration) - Environment-based configuration
+- **API Testing**: REST Client files for comprehensive endpoint testing
 
 ## ✨ Current Status & Features
 
-### ✅ Implemented Features
-- **User Management**: Full CRUD operations for user entities
-- **Authentication & Authorization**: Complete JWT-based auth system with refresh tokens
-  - JWT Access & Refresh token strategy
-  - Cookie-based token storage with security headers
-  - Token rotation and automatic refresh
-  - Local strategy for login with email/password
-  - Protected routes with Passport guards
-- **Database Schema**: PostgreSQL with Drizzle ORM integration
-- **Validation**: Comprehensive input validation with Zod schemas
-- **Security**: 
-  - Argon2 password hashing for secure authentication
+### ✅ Backend Features (NestJS API)
+- **User Management**: Complete CRUD operations for user entities with UUID identification
+- **Authentication & Authorization**: Full JWT-based auth system with dual-token strategy
+  - JWT Access & Refresh token implementation with automatic rotation
+  - Cookie-based token storage with HTTP-only security
+  - Multiple Passport strategies (Local, JWT Access, JWT Refresh)
+  - Protected routes with role-based guards
+- **Database Integration**: PostgreSQL with Drizzle ORM and type-safe queries
+- **Security Implementation**: 
+  - Argon2 password hashing with salt generation
   - CORS configuration with credentials support
-  - HTTP-only cookies for token storage
-  - Secure cookie settings for production
-- **Type Safety**: End-to-end TypeScript with database type inference
-- **Testing**: Unit and E2E test setup with Jest
-- **Development**: Hot reload development server with clean output
-- **Docker**: PostgreSQL containerization for easy development
+  - Secure cookie settings (HTTP-only, SameSite, Secure in production)
+  - Session tracking with user agent and IP address logging
+- **Input Validation**: Comprehensive validation with Zod schemas and nestjs-zod integration
+- **API Documentation**: REST client files with comprehensive endpoint testing
+- **Development Tools**: Hot reload, TypeScript support, database migrations
+
+### ✅ Frontend Features (Next.js Web App)
+- **Modern UI/UX**: Responsive design with Tailwind CSS and Radix UI components
+- **Authentication Forms**: 
+  - Sign up form with validation (email, password, name fields)
+  - Sign in form with error handling and success notifications
+  - Form validation with real-time error messages
+- **User Interface Components**: 
+  - Accessible form components with proper labeling
+  - Toast notifications for user feedback
+  - Card-based layout with consistent styling
+- **API Integration**: 
+  - Axios-based HTTP client with error handling
+  - API proxy routes for backend communication
+  - Cookie-based authentication flow
+- **Developer Experience**:
+  - TypeScript throughout with strict type checking
+  - Hot module replacement for fast development
+  - ESLint configuration for code quality
+
+### ✅ Full-Stack Integration
+- **Seamless Authentication**: Frontend forms integrate with backend JWT system
+- **Type Safety**: End-to-end TypeScript from database to UI components
+- **Development Environment**: Docker-composed database with hot reload on both ends
+- **Security**: HTTP-only cookies, CORS configuration, and secure token handling
+- **Testing Infrastructure**: Comprehensive test setup with Jest for backend
 
 ### 🚧 Upcoming Features
-- Health data models and tracking
-- API rate limiting and security middleware
-- Swagger/OpenAPI documentation
-- Health metrics and analytics
-- File upload capabilities
-- Email notification system
+- **Health Data Models**: Patient records, medical history, health metrics tracking
+- **Dashboard Interface**: Health analytics, charts, and progress visualization
+- **API Enhancements**: Rate limiting, API versioning, Swagger documentation
+- **Advanced Security**: 2FA, password reset, email verification
+- **File Management**: Profile pictures, document uploads, medical reports
+- **Notifications**: Email alerts, push notifications, appointment reminders
+- **Mobile Optimization**: Progressive Web App (PWA) capabilities
 
 ## 🚀 Quick Start
 
@@ -72,21 +112,28 @@ Make sure you have the following installed:
    ```
    This will start a PostgreSQL database on port `5433`.
 
-3. **Install backend dependencies**
+3. **Backend Setup**
    ```bash
    cd backend
    pnpm install
    ```
 
-4. **Set up environment variables**
-   Create a `.env` file in the `backend` directory:
+4. **Frontend Setup**
+   ```bash
+   cd ../frontend
+   pnpm install
+   ```
+
+5. **Environment Configuration**
+   
+   **Backend** - Create `.env` file in the `backend` directory:
    ```env
    # Database Configuration
    DATABASE_URL=postgresql://postgres:password@localhost:5433/health_app_db
    
    # JWT Configuration
-   JWT_ACCESS_TOKEN_SECRET=your-super-secret-access-token-key-here
-   JWT_REFRESH_TOKEN_SECRET=your-super-secret-refresh-token-key-here
+   JWT_ACCESS_TOKEN_SECRET=your-super-secret-access-token-key-here-min-32-chars
+   JWT_REFRESH_TOKEN_SECRET=your-super-secret-refresh-token-key-here-min-32-chars
    JWT_ACCESS_TOKEN_EXPIRATION_TIME=900    # 15 minutes in seconds
    JWT_REFRESH_TOKEN_EXPIRATION_TIME=604800 # 7 days in seconds
    
@@ -95,18 +142,38 @@ Make sure you have the following installed:
    PORT=5000
    FRONTEND_URL=http://localhost:3000
    ```
+   
+   **Frontend** - Create `.env.local` file in the `frontend` directory:
+   ```env
+   # Backend API Configuration
+   BACKEND_API_URL=http://localhost:5000
+   
+   # Application Configuration
+   NODE_ENV=development
+   ```
 
-5. **Run database migrations**
+6. **Database Setup**
    ```bash
+   cd backend
    pnpm drizzle:push
    ```
 
-6. **Start the development server**
+7. **Start Development Servers**
+   
+   **Backend** (Terminal 1):
    ```bash
+   cd backend
    pnpm start:dev
    ```
+   
+   **Frontend** (Terminal 2):
+   ```bash
+   cd frontend
+   pnpm dev
+   ```
 
-The API will be available at `http://localhost:5000`.
+   - **Backend API**: `http://localhost:5000`
+   - **Frontend Web App**: `http://localhost:3000`
 
 > **Note**: The development server runs with `--no-deprecation` flag to suppress Node.js deprecation warnings for a cleaner development experience.
 
@@ -116,68 +183,133 @@ The API will be available at `http://localhost:5000`.
 health-app/
 ├── docker-compose.yaml     # PostgreSQL container configuration
 ├── README.md              # Project documentation (this file)
-└── backend/               # NestJS backend application
-    ├── src/
-    │   ├── main.ts         # Application entry point
-    │   ├── app.module.ts   # Root module
-    │   ├── database/       # Drizzle database configuration & service
-    │   │   ├── drizzle.module.ts
-    │   │   └── drizzle.service.ts
-    │   ├── auth/           # Authentication module
-    │   │   ├── auth.controller.ts     # Auth REST API endpoints  
-    │   │   ├── auth.service.ts        # Authentication business logic
-    │   │   ├── auth.module.ts         # Auth module configuration
-    │   │   ├── auth.schema.ts         # Auth database schema & validation
-    │   │   ├── dto/                   # Auth data transfer objects
-    │   │   │   └── signup.dto.ts
-    │   │   └── strategies/            # Passport authentication strategies
-    │   │       ├── local.strategy.ts   # Email/password login strategy
-    │   │       ├── jwt-access.strategy.ts # JWT access token strategy
-    │   │       └── jwt-refresh.strategy.ts # JWT refresh token strategy
-    │   └── users/          # User management module
-    │       ├── users.controller.ts    # REST API endpoints
-    │       ├── users.service.ts       # Business logic
-    │       ├── users.module.ts        # Module configuration
-    │       ├── users.schema.ts        # Database schema & validation
-    │       └── dto/                   # Data transfer objects
-    │           ├── create-user.dto.ts
-    │           └── update-user.dto.ts
-    ├── drizzle/            # Database migrations & metadata
-    │   ├── 0000_stiff_mantis.sql
-    │   └── meta/
-    ├── test/               # E2E tests
-    ├── drizzle.config.ts   # Drizzle ORM configuration
-    └── package.json        # Dependencies and scripts
+├── backend/               # NestJS backend application
+│   ├── src/
+│   │   ├── main.ts         # Application entry point with CORS & cookie configuration
+│   │   ├── app.module.ts   # Root module with global configuration
+│   │   ├── database/       # Drizzle database configuration & service
+│   │   │   ├── drizzle.module.ts
+│   │   │   └── drizzle.service.ts
+│   │   ├── auth/           # Authentication module (JWT + Passport)
+│   │   │   ├── auth.controller.ts     # Auth REST API endpoints  
+│   │   │   ├── auth.service.ts        # Authentication business logic
+│   │   │   ├── auth.module.ts         # Auth module configuration
+│   │   │   ├── auth.schema.ts         # Auth database schema & Zod validation
+│   │   │   ├── dto/                   # Auth data transfer objects
+│   │   │   │   └── signup.dto.ts
+│   │   │   └── strategies/            # Passport authentication strategies
+│   │   │       ├── local.strategy.ts   # Email/password login strategy
+│   │   │       ├── jwt-access.strategy.ts # JWT access token strategy
+│   │   │       └── jwt-refresh.strategy.ts # JWT refresh token strategy
+│   │   └── users/          # User management module
+│   │       ├── users.controller.ts    # REST API endpoints
+│   │       ├── users.service.ts       # Business logic with Argon2 hashing
+│   │       ├── users.module.ts        # Module configuration
+│   │       ├── users.schema.ts        # Database schema & validation
+│   │       └── dto/                   # Data transfer objects
+│   │           ├── create-user.dto.ts
+│   │           └── update-user.dto.ts
+│   ├── drizzle/            # Database migrations & metadata
+│   │   ├── 0000_stiff_mantis.sql      # User table migration
+│   │   ├── 0001_dizzy_shen.sql        # Auth tokens table migration
+│   │   ├── 0002_solid_killraven.sql   # Schema updates
+│   │   ├── 0003_chilly_maginty.sql    # Additional migrations
+│   │   ├── 0004_rich_madame_hydra.sql # Latest schema changes
+│   │   └── meta/                      # Migration metadata
+│   ├── test/               # E2E tests with Jest
+│   ├── drizzle.config.ts   # Drizzle ORM configuration
+│   └── package.json        # Backend dependencies and scripts
+├── frontend/              # Next.js frontend application
+│   ├── app/
+│   │   ├── globals.css     # Global styles with Tailwind CSS
+│   │   ├── layout.tsx      # Root layout component
+│   │   ├── page.tsx        # Home page component
+│   │   ├── (auth)/         # Auth route group
+│   │   │   └── auth/
+│   │   │       ├── sign-in/page.tsx   # Sign in page
+│   │   │       └── sign-up/page.tsx   # Sign up page
+│   │   └── api/            # Next.js API routes
+│   │       ├── auth/       # Authentication proxy endpoints
+│   │       │   └── sign-in/route.ts   # Sign-in API proxy with cookies
+│   │       └── [...path]/  # Dynamic API proxy to backend
+│   │           └── route.ts # Universal API proxy with token handling
+│   ├── components/         # React UI components
+│   │   ├── profile.tsx     # User profile component
+│   │   ├── sign-in-form.tsx # Sign-in form with validation
+│   │   ├── sign-up-form.tsx # Sign-up form with validation
+│   │   └── ui/             # Reusable UI components (Radix + Tailwind)
+│   │       ├── alert.tsx
+│   │       ├── button.tsx
+│   │       ├── card.tsx
+│   │       ├── field.tsx   # Form field components
+│   │       ├── input.tsx
+│   │       ├── label.tsx
+│   │       ├── separator.tsx
+│   │       └── sonner.tsx  # Toast notifications
+│   ├── lib/                # Utility libraries
+│   │   ├── utils.ts        # Utility functions
+│   │   ├── config.ts       # Configuration constants
+│   │   ├── token.ts        # Token management utilities
+│   │   └── apiClient.ts    # Axios HTTP client configuration
+│   ├── public/             # Static assets
+│   ├── components.json     # Shadcn/UI configuration
+│   ├── next.config.ts      # Next.js configuration
+│   ├── tailwind.config.mjs # Tailwind CSS configuration
+│   └── package.json        # Frontend dependencies and scripts
+└── rest-client/           # API testing files
+    ├── auth.http          # Authentication endpoint tests
+    └── users.http         # User management endpoint tests
 ```
 
 ## 🛠️ Available Scripts
 
-Navigate to the `backend` directory and run:
+### Backend Scripts (in `backend/` directory)
 
-### Development
-- `pnpm start:dev` - Start development server with hot reload
+#### Development
+- `pnpm start:dev` - Start development server with hot reload (no deprecation warnings)
 - `pnpm start:debug` - Start with debug mode enabled
-
-### Building & Production
-- `pnpm build` - Build the application
 - `pnpm start:prod` - Start production server
 
-### Database Operations
+#### Building & Production
+- `pnpm build` - Build the NestJS application
+- `pnpm start` - Start built application
+
+#### Database Operations
 - `pnpm drizzle:generate` - Generate new migrations from schema changes
-- `pnpm drizzle:push` - Push schema changes directly to database (dev only)
-- `pnpm drizzle:migrate` - Run pending migrations (production)
+- `pnpm drizzle:push` - Push schema changes directly to database (development only)
+- `pnpm drizzle:migrate` - Run pending migrations (production recommended)
 - `pnpm drizzle:status` - Check migration status
-- `pnpm drizzle:reset` - Reset database (⚠️ destructive operation)
+- `pnpm drizzle:studio` - Open Drizzle Studio for database management
 
-### Testing
-- `pnpm test` - Run unit tests
-- `pnpm test:watch` - Run tests in watch mode
+#### Testing
+- `pnpm test` - Run unit tests with Jest
+- `pnpm test:watch` - Run tests in watch mode for development
 - `pnpm test:cov` - Run tests with coverage report
-- `pnpm test:e2e` - Run end-to-end tests
+- `pnpm test:e2e` - Run end-to-end integration tests
 
-### Code Quality
-- `pnpm lint` - Lint and fix code issues
+#### Code Quality
+- `pnpm lint` - ESLint with automatic fixes
 - `pnpm format` - Format code with Prettier
+
+### Frontend Scripts (in `frontend/` directory)
+
+#### Development
+- `pnpm dev` - Start Next.js development server with hot reload
+- `pnpm build` - Build the Next.js application for production
+- `pnpm start` - Start the production build locally
+
+#### Code Quality
+- `pnpm lint` - ESLint with Next.js configuration
+
+### Full-Stack Development Workflow
+
+1. **Start Database**: `docker-compose up -d` (from root)
+2. **Backend**: `cd backend && pnpm start:dev`
+3. **Frontend**: `cd frontend && pnpm dev`
+4. **Access**: 
+   - Frontend: `http://localhost:3000`
+   - Backend API: `http://localhost:5000`
+   - Database: `localhost:5433` (PostgreSQL)
 
 ## 🗄️ Database
 
@@ -214,27 +346,39 @@ This project uses Drizzle ORM for database operations:
 
 ## 🔧 Development
 
-### Adding New Features
+### Adding New Backend Features
 
-1. Create new modules using NestJS CLI:
+1. **Create NestJS modules** using the CLI:
    ```bash
+   cd backend
    nest generate module feature-name
    nest generate controller feature-name
    nest generate service feature-name
    ```
 
-2. Define database schemas using Drizzle ORM in `*.schema.ts` files
+2. **Define database schemas** using Drizzle ORM in `src/*/**.schema.ts` files with Zod validation
 
-3. Generate and run migrations:
+3. **Generate and run migrations**:
    ```bash
-   pnpm drizzle:generate
-   pnpm drizzle:push
+   pnpm drizzle:generate  # Generate migration files
+   pnpm drizzle:push      # Apply to development database
    ```
 
-### Environment Variables
+### Adding New Frontend Features
 
-Create a `.env` file in the backend directory with the following variables:
+1. **Create React components** in `components/` directory:
+   ```bash
+   cd frontend
+   # Add new components, pages, or UI elements
+   ```
 
+2. **Add new routes** in the `app/` directory using Next.js App Router
+
+3. **Create reusable UI components** following the existing pattern with Radix UI and Tailwind CSS
+
+### Environment Configuration
+
+**Backend** (`.env` in `backend/` directory):
 ```env
 # Database Configuration
 DATABASE_URL=postgresql://postgres:password@localhost:5433/health_app_db
@@ -254,7 +398,22 @@ FRONTEND_URL=http://localhost:3000
 # node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
-The application uses NestJS Config module for environment management with validation and type safety.
+**Frontend** (`.env.local` in `frontend/` directory):
+```env
+# Backend API Configuration
+BACKEND_API_URL=http://localhost:5000
+
+# Application Configuration
+NODE_ENV=development
+```
+
+### Development Tools & Configuration
+
+- **Backend**: NestJS Config module with environment validation and type safety
+- **Frontend**: Next.js with TypeScript, ESLint, and Tailwind CSS configuration
+- **Database**: Drizzle Studio available via `pnpm drizzle:studio` for visual database management
+- **API Testing**: Use REST client files in `rest-client/` for comprehensive endpoint testing
+- **Type Safety**: Full TypeScript coverage from database schemas to UI components
 
 ## 🔐 Authentication & Security
 
@@ -401,21 +560,31 @@ This project is licensed under the UNLICENSED license.
 
 ## 🔗 Useful Links
 
-### Framework Documentation
-- [NestJS Documentation](https://docs.nestjs.com/) - Backend framework
+### Backend Documentation
+- [NestJS Documentation](https://docs.nestjs.com/) - Backend framework and architecture
 - [NestJS Authentication](https://docs.nestjs.com/security/authentication) - JWT & Passport integration
 - [Passport.js Documentation](https://www.passportjs.org/docs/) - Authentication strategies
-- [Drizzle ORM Documentation](https://orm.drizzle.team/) - Database ORM
-- [Zod Documentation](https://zod.dev/) - Schema validation
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/) - Database
+- [Drizzle ORM Documentation](https://orm.drizzle.team/) - Database ORM and queries
+- [Zod Documentation](https://zod.dev/) - Schema validation and type inference
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/) - Database features and SQL
 
-### Tools & Development
-- [Docker Documentation](https://docs.docker.com/) - Containerization
-- [pnpm Documentation](https://pnpm.io/) - Package manager
-- [Jest Documentation](https://jestjs.io/) - Testing framework
-- [Argon2 Documentation](https://github.com/ranisalt/node-argon2) - Password hashing
+### Frontend Documentation
+- [Next.js Documentation](https://nextjs.org/docs) - Full-stack React framework
+- [React Documentation](https://react.dev/) - React 19 features and patterns
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs) - Utility-first CSS framework
+- [Radix UI Documentation](https://www.radix-ui.com/primitives) - Accessible UI components
+- [TanStack Form](https://tanstack.com/form) - Powerful form state management
+- [Axios Documentation](https://axios-http.com/docs/) - HTTP client library
 
-### Development Tools
-- [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview) - Database migrations
-- [NestJS CLI](https://docs.nestjs.com/cli/overview) - Code generation
-- [TypeScript Documentation](https://www.typescriptlang.org/docs/) - Language reference
+### Development Tools & Infrastructure
+- [Docker Documentation](https://docs.docker.com/) - Containerization and database setup
+- [pnpm Documentation](https://pnpm.io/) - Fast and efficient package manager
+- [Jest Documentation](https://jestjs.io/) - Testing framework and utilities
+- [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview) - Database migrations and studio
+- [NestJS CLI](https://docs.nestjs.com/cli/overview) - Code generation and project scaffolding
+- [TypeScript Documentation](https://www.typescriptlang.org/docs/) - Language reference and features
+
+### Security & Authentication
+- [Argon2 Documentation](https://github.com/ranisalt/node-argon2) - Password hashing algorithm
+- [JWT.io](https://jwt.io/) - JSON Web Token standards and debugging
+- [OWASP Security Guidelines](https://owasp.org/) - Web application security best practices
