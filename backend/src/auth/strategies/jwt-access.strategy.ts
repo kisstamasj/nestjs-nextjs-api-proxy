@@ -31,7 +31,16 @@ export class JwtAccessStrategy extends PassportStrategy(
       throw new UnauthorizedException('User not found');
     }
 
-    const accessToken = req.cookies?.access_token;
+    // Extract access token from Authorization header as bearer token
+    const authHeader = req.headers['authorization'];
+    const accessToken =
+      authHeader && authHeader.startsWith('Bearer ')
+        ? authHeader.slice(7)
+        : null;
+
+    if (!accessToken) {
+      throw new UnauthorizedException('Access token not found');
+    }
 
     const existingToken =
       await this.authService.getTokenByAccessToken(accessToken);

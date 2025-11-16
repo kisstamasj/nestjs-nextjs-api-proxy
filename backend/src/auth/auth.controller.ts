@@ -26,7 +26,7 @@ type LoggedInUser = User & { accessToken: string; refreshToken: string };
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('signup')
+  @Post('sign-up')
   async signUp(@Body() signUpDto: SignUpDto) {
     return this.authService.signup(signUpDto);
   }

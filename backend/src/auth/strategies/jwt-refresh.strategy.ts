@@ -25,7 +25,12 @@ export class JwtRefreshStrategy extends PassportStrategy(
   }
 
   async validate(req: Request, payload: { sub: string; email: string }) {
-    const refreshToken = req.cookies?.refresh_token;
+    // Extract refresh token from Authorization header as bearer token
+    const authHeader = req.headers['authorization'];
+    const refreshToken =
+      authHeader && authHeader.startsWith('Bearer ')
+        ? authHeader.slice(7)
+        : null;
 
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token not found');
