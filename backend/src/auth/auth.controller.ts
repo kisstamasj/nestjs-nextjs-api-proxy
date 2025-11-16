@@ -59,7 +59,7 @@ export class AuthController {
     const user = req.user;
     const userAgent = req.headers['user-agent'] || 'unknown';
     const ipAddress = req.ip;
-    const oldRefreshToken = (req.user as any).refreshToken;
+    const oldRefreshToken = req.user.refreshToken;
 
     const { accessToken, refreshToken } = await this.authService.signTokens(
       user,
