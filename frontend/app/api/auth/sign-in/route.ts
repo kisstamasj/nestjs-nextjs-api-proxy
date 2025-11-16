@@ -1,5 +1,6 @@
 import { BACKEND_API_URL } from "@/lib/config";
-import { getAccessTokenOptions, getRefreshTokenOptions } from "@/lib/token";
+import { encrypt, SessionPayload } from "@/lib/session";
+import { getSessionTokenOption } from "@/lib/token";
 import { cookies } from "next/headers";
 
 export async function POST(req: Request) {
@@ -21,11 +22,21 @@ export async function POST(req: Request) {
   console.log("Auth sign-in response data:", data);
 
   if (res.ok) {
-    const { accessToken, refreshToken } = data;
+    const { accessToken, refreshToken, id, email, firstName, lastName } = data;
+
+    const sessionPayload: SessionPayload = {
+      id,
+      email,
+      firstName,
+      lastName,
+      accessToken,
+      refreshToken,
+    };
+
+    const encryptedSession = await encrypt(sessionPayload);
 
     // Set HttpOnly cookies
-    cookieStore.set(getAccessTokenOptions(accessToken));
-    cookieStore.set(getRefreshTokenOptions(refreshToken));
+    cookieStore.set(getSessionTokenOption(encryptedSession));
   }
 
   const response = new Response(JSON.stringify(data), {
