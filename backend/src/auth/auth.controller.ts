@@ -14,10 +14,13 @@ import { Request, Response } from 'express';
 import { RequestUser } from './auth.schema';
 import { AuthService } from './auth.service';
 import { SignUpDto } from './dto/signup.dto';
+import { User } from 'src/users/users.schema';
 
 interface RequestWithUser extends Request {
   user: RequestUser;
 }
+
+type LoggedInUser = User & { accessToken: string; refreshToken: string };
 
 @Controller('auth')
 export class AuthController {
@@ -30,11 +33,8 @@ export class AuthController {
 
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard('local'))
-  @Post('signin')
-  async login(
-    @Req() req: RequestWithUser,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  @Post('sign-in')
+  async login(@Req() req: RequestWithUser) {
     const user = req.user;
     const userAgent = req.headers['user-agent'] || 'unknown';
     const ipAddress = req.ip;
@@ -45,9 +45,9 @@ export class AuthController {
       ipAddress,
     );
 
-    this.setAuthCookie(res, accessToken, refreshToken);
+    const loggedInUser: LoggedInUser = { ...user, accessToken, refreshToken };
 
-    return user;
+    return loggedInUser;
   }
 
   @UseGuards(AuthGuard('jwt-refresh'))
@@ -68,12 +68,7 @@ export class AuthController {
       oldRefreshToken,
     );
 
-    // Set new cookies directly instead of clearing first to avoid race conditions
-    this.setAuthCookie(res, accessToken, refreshToken);
-
-    const { refreshToken: _, ...userWithoutRefreshToken } = user;
-
-    return userWithoutRefreshToken;
+    return { accessToken, refreshToken };
   }
 
   @UseGuards(AuthGuard('jwt-access'))
@@ -83,60 +78,14 @@ export class AuthController {
   }
 
   @UseGuards(AuthGuard('jwt-access'))
-  @Post('logout')
-  async logout(@Res({ passthrough: true }) res: Response) {
+  @Post('sign-out')
+  async signOut(@Res({ passthrough: true }) res: Response) {
     const refreshToken = res.req.cookies?.refresh_token;
 
     if (refreshToken) {
-      await this.authService.logout(refreshToken);
+      await this.authService.signOut(refreshToken);
     }
-    this.clearAuthCookies(res);
 
     return { message: 'Successfully logged out.' };
-  }
-
-  private setAuthCookie(
-    res: Response,
-    accessToken: string,
-    refreshToken: string,
-  ) {
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
-      path: '/', // Explicitly set path
-    };
-
-    res.cookie('access_token', accessToken, {
-      ...cookieOptions,
-      maxAge:
-        parseInt(
-          this.authService['configService'].get<string>(
-            'JWT_ACCESS_TOKEN_EXPIRATION_TIME',
-          ),
-        ) * 1000,
-    });
-
-    res.cookie('refresh_token', refreshToken, {
-      ...cookieOptions,
-      maxAge:
-        parseInt(
-          this.authService['configService'].get<string>(
-            'JWT_REFRESH_TOKEN_EXPIRATION_TIME',
-          ),
-        ) * 1000,
-    });
-  }
-
-  private clearAuthCookies(res: Response) {
-    const clearOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
-      path: '/',
-    };
-
-    res.clearCookie('access_token', clearOptions);
-    res.clearCookie('refresh_token', clearOptions);
   }
 }

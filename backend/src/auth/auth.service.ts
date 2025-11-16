@@ -105,7 +105,7 @@ export class AuthService {
     return token;
   }
 
-  async logout(refreshToken: string): Promise<void> {
+  async signOut(refreshToken: string): Promise<void> {
     await this.drizzle.db
       .delete(tokens)
       .where(eq(tokens.refreshToken, refreshToken));
