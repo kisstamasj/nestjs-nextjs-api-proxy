@@ -68,7 +68,7 @@ export class AuthController {
       oldRefreshToken,
     );
 
-    return { accessToken, refreshToken };
+    return { access_token: accessToken, refresh_token: refreshToken };
   }
 
   @UseGuards(AuthGuard('jwt-access'))
