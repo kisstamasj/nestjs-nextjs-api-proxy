@@ -19,10 +19,12 @@ A modern full-stack health application with a NestJS backend API and Next.js fro
 - **Framework**: [Next.js](https://nextjs.org/) v16.0.3 - React-based full-stack framework with App Router
 - **React**: [React](https://react.dev/) v19.2.0 - Modern React with latest features
 - **UI Components**: 
-  - [Shadcn-ui](https://ui.shadcn.com) - UI library
+  - [Radix UI](https://www.radix-ui.com/) - Unstyled, accessible UI primitives
   - [Tailwind CSS](https://tailwindcss.com/) v4 - Utility-first CSS framework
   - [Lucide React](https://lucide.dev/) - Beautiful & consistent icon toolkit
 - **Forms**: [TanStack Form](https://tanstack.com/form) v1.25.0 - Powerful form state management
+- **HTTP Client**: [Axios](https://axios-http.com/) v1.13.2 - Promise-based HTTP client
+- **JWT Handling**: [jose](https://github.com/panva/jose) v6.1.2 - Universal JWT library for JavaScript
 - **Notifications**: [Sonner](https://sonner.emilkowal.ski/) v2.0.7 - Toast notifications
 - **Theming**: [Next Themes](https://github.com/pacocoursey/next-themes) v0.4.6 - Theme switching
 
@@ -30,20 +32,23 @@ A modern full-stack health application with a NestJS backend API and Next.js fro
 - **Runtime**: [Node.js](https://nodejs.org/) - JavaScript runtime environment
 - **Package Manager**: [pnpm](https://pnpm.io/) - Fast, disk space efficient package manager
 - **Containerization**: [Docker](https://www.docker.com/) - PostgreSQL database containerization
+- **IDE Configuration**: [VS Code](https://code.visualstudio.com/) workspace with extensions and debug setup
 - **API Testing**: REST Client files for comprehensive endpoint testing
 
 ## ✨ Current Status & Features
 
 ### ✅ Backend Features (NestJS API)
 - **User Management**: Complete CRUD operations for user entities with UUID identification
-- **Authentication & Authorization**: Full JWT-based auth system with dual-token strategy
+- **Authentication & Authorization**: Complete JWT-based auth system with dual-token strategy
   - JWT Access & Refresh token implementation with automatic rotation
   - Multiple Passport strategies (Local, JWT Access, JWT Refresh)
+  - Session tracking with token persistence in database
   - Protected routes with role-based guards
 - **Database Integration**: PostgreSQL with Drizzle ORM and type-safe queries
 - **Security Implementation**: 
   - Argon2 password hashing with salt generation
-  - CORS configuration with credentials suppor
+  - CORS configuration with credentials support
+  - Encrypted session management with jose JWT library
   - Session tracking with user agent and IP address logging
 - **Input Validation**: Comprehensive validation with Zod schemas and nestjs-zod integration
 - **API Documentation**: REST client files with comprehensive endpoint testing
@@ -51,17 +56,20 @@ A modern full-stack health application with a NestJS backend API and Next.js fro
 
 ### ✅ Frontend Features (Next.js Web App)
 - **Modern UI/UX**: Responsive design with Tailwind CSS and Radix UI components
-- **Authentication Forms**: 
-  - Sign up form with validation (email, password, name fields)
-  - Sign in form with error handling and success notifications
-  - Form validation with real-time error messages
+- **Authentication System**: 
+  - Session-based authentication with encrypted cookies
+  - Sign up and sign in forms with comprehensive validation
+  - Automatic token refresh and session management
+  - Protected routes with session verification
 - **User Interface Components**: 
   - Accessible form components with proper labeling
   - Toast notifications for user feedback
   - Card-based layout with consistent styling
 - **API Integration**: 
-  - API proxy routes for backend communication
-  - Cookie-based authentication flow (httpony cookie)
+  - Native fetch API for HTTP requests
+  - Dynamic API proxy routes for seamless backend communication
+  - Encrypted session storage with HTTP-only cookies
+  - Automatic token rotation and error handling
 - **Developer Experience**:
   - TypeScript throughout with strict type checking
   - Hot module replacement for fast development
@@ -142,6 +150,9 @@ Make sure you have the following installed:
    # Backend API Configuration
    BACKEND_API_URL=http://localhost:5000
    
+   # Session Configuration - IMPORTANT: Use a strong secret in production!
+   SESSION_SECRET=your-super-secret-session-key-here-min-32-chars
+   
    # Application Configuration
    NODE_ENV=development
    ```
@@ -175,6 +186,9 @@ Make sure you have the following installed:
 
 ```
 health-app/
+├── .vscode/               # VS Code workspace configuration
+│   ├── extensions.json    # Recommended extensions (REST Client)
+│   └── launch.json        # Debug configuration for NestJS
 ├── docker-compose.yaml     # PostgreSQL container configuration
 ├── README.md              # Project documentation (this file)
 ├── backend/               # NestJS backend application
@@ -219,9 +233,8 @@ health-app/
 │   │   ├── layout.tsx      # Root layout component
 │   │   ├── page.tsx        # Home page component
 │   │   ├── (auth)/         # Auth route group
-│   │   │   └── auth/
-│   │   │       ├── sign-in/page.tsx   # Sign in page
-│   │   │       └── sign-up/page.tsx   # Sign up page
+│   │   │   ├── sign-in/page.tsx   # Sign in page with session protection
+│   │   │   └── sign-up/page.tsx   # Sign up page
 │   │   └── api/            # Next.js API routes
 │   │       ├── auth/       # Authentication proxy endpoints
 │   │       │   └── sign-in/route.ts   # Sign-in API proxy with cookies
@@ -243,8 +256,9 @@ health-app/
 │   ├── lib/                # Utility libraries
 │   │   ├── utils.ts        # Utility functions
 │   │   ├── config.ts       # Configuration constants
-│   │   ├── token.ts        # Token management utilities
-│   │   └── apiClient.ts    # Axios HTTP client configuration
+│   │   ├── token.ts        # Token and cookie management utilities
+│   │   ├── session.ts      # Session encryption/decryption with jose
+│   │   └── apiClient.ts    # HTTP client configuration
 │   ├── public/             # Static assets
 │   ├── components.json     # Shadcn/UI configuration
 │   ├── next.config.ts      # Next.js configuration
@@ -397,6 +411,9 @@ FRONTEND_URL=http://localhost:3000
 # Backend API Configuration
 BACKEND_API_URL=http://localhost:5000
 
+# Session Configuration - IMPORTANT: Use a strong secret in production!
+SESSION_SECRET=your-super-secret-session-key-here-min-32-chars
+
 # Application Configuration
 NODE_ENV=development
 ```
@@ -407,26 +424,29 @@ NODE_ENV=development
 - **Frontend**: Next.js with TypeScript, ESLint, and Tailwind CSS configuration
 - **Database**: Drizzle Studio available via `pnpm drizzle:studio` for visual database management
 - **API Testing**: Use REST client files in `rest-client/` for comprehensive endpoint testing
+- **IDE Support**: VS Code workspace with recommended extensions (REST Client) and NestJS debug configuration
 - **Type Safety**: Full TypeScript coverage from database schemas to UI components
 
 ## 🔐 Authentication & Security
 
 ### JWT Token Strategy
 
-The application implements a dual-token JWT authentication system:
+The application implements a dual-token JWT authentication system with encrypted sessions:
 
 - **Access Token**: Short-lived (15 minutes) for API access
 - **Refresh Token**: Long-lived (7 days) for token renewal
-- **Cookie Storage**: HTTP-only cookies prevent XSS attacks
-- **Token Rotation**: Automatic refresh token rotation on each use
+- **Session Encryption**: JWT session payload encrypted using jose library
+- **Cookie Storage**: HTTP-only, encrypted session cookies prevent XSS attacks
+- **Token Rotation**: Automatic refresh token rotation with session updates
 
 ### Security Configuration
 
 - **CORS**: Configured with credentials support for cookie-based auth
+- **Session Encryption**: JWT-based session encryption using HS256 algorithm
 - **Cookie Security**: HTTP-only, Secure (production), SameSite strict
 - **Password Hashing**: Argon2 with automatic salt generation
-- **Token Secrets**: Environment-based JWT secrets (min 32 characters)
-- **Route Protection**: Passport guards on protected endpoints
+- **Environment Secrets**: JWT and session secrets with minimum 32 characters
+- **Route Protection**: Passport guards and session validation on protected endpoints
 
 ### Authentication Flow
 
@@ -521,16 +541,17 @@ The API follows RESTful conventions with comprehensive validation, type safety, 
 ### Authentication Flow
 
 1. **Registration**: `POST /auth/signup` with user details
-2. **Login**: `POST /auth/signin` returns user data + sets HTTP-only cookies
-3. **Protected Routes**: Access token automatically sent via cookies
-4. **Token Refresh**: Automatic refresh when access token expires
-5. **Logout**: `POST /auth/logout` clears cookies and invalidates refresh token
+2. **Login**: `POST /auth/signin` returns user data + creates encrypted session
+3. **Session Storage**: Encrypted session payload stored in HTTP-only cookies
+4. **Protected Routes**: Session automatically decrypted and validated
+5. **Token Refresh**: Automatic access token refresh with session update
+6. **Logout**: Session cleared and tokens invalidated on backend
 
 ### Security Features
 - ✅ **Authentication**: Complete JWT-based authentication system
 - ✅ **Authorization**: Route-level protection with Passport guards  
-- ✅ **Token Management**: Access + Refresh token rotation strategy
-- ✅ **Cookie Security**: HTTP-only, Secure, SameSite strict cookies
+- ✅ **Session Management**: Encrypted JWT sessions with automatic token rotation
+- ✅ **Cookie Security**: HTTP-only, Secure, SameSite strict encrypted session cookies
 - ✅ **Password Security**: Argon2 hashing with salt
 - ✅ **Session Tracking**: User agent and IP tracking for security
 - ✅ **CORS Protection**: Configurable CORS with credentials support
