@@ -191,6 +191,21 @@ async function handleRequest(
     }
   }
 
+  // if signed out, clear cookies
+  if (fullPath === "/auth/sign-out" && response.ok) {
+    const data = await response.text();
+    const nextResponse = new NextResponse(data, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+
+    nextResponse.cookies.delete(ACCESS_TOKEN_COOKIE);
+    nextResponse.cookies.delete(REFRESH_TOKEN_COOKIE);
+
+    return nextResponse;
+  }
+
   // Forward the response as-is
   const data = await response.text();
   const nextResponse = new NextResponse(data, {
