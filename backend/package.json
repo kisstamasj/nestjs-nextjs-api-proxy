@@ -32,7 +32,6 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.8",
     "argon2": "^0.44.0",
-    "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.44.7",
     "drizzle-zod": "^0.8.3",
     "nestjs-zod": "^5.0.1",
