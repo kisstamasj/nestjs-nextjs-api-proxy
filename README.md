@@ -14,17 +14,15 @@ A modern full-stack health application with a NestJS backend API and Next.js fro
   - [NestJS JWT](https://docs.nestjs.com/security/authentication) v11.0.1 - JWT token management
   - [NestJS Passport](https://docs.nestjs.com/recipes/passport) v11.0.5 - Passport integration
   - [Argon2](https://github.com/ranisalt/node-argon2) v0.44.0 - Secure password hashing
-  - [Cookie Parser](https://github.com/expressjs/cookie-parser) v1.4.7 - Cookie parsing middleware
 
 ### Frontend
 - **Framework**: [Next.js](https://nextjs.org/) v16.0.3 - React-based full-stack framework with App Router
 - **React**: [React](https://react.dev/) v19.2.0 - Modern React with latest features
 - **UI Components**: 
-  - [Radix UI](https://www.radix-ui.com/) - Unstyled, accessible UI primitives
+  - [Shadcn-ui](https://ui.shadcn.com) - UI library
   - [Tailwind CSS](https://tailwindcss.com/) v4 - Utility-first CSS framework
   - [Lucide React](https://lucide.dev/) - Beautiful & consistent icon toolkit
 - **Forms**: [TanStack Form](https://tanstack.com/form) v1.25.0 - Powerful form state management
-- **HTTP Client**: [Axios](https://axios-http.com/) v1.13.2 - Promise-based HTTP client
 - **Notifications**: [Sonner](https://sonner.emilkowal.ski/) v2.0.7 - Toast notifications
 - **Theming**: [Next Themes](https://github.com/pacocoursey/next-themes) v0.4.6 - Theme switching
 
@@ -32,7 +30,6 @@ A modern full-stack health application with a NestJS backend API and Next.js fro
 - **Runtime**: [Node.js](https://nodejs.org/) - JavaScript runtime environment
 - **Package Manager**: [pnpm](https://pnpm.io/) - Fast, disk space efficient package manager
 - **Containerization**: [Docker](https://www.docker.com/) - PostgreSQL database containerization
-- **Configuration**: [NestJS Config](https://docs.nestjs.com/techniques/configuration) - Environment-based configuration
 - **API Testing**: REST Client files for comprehensive endpoint testing
 
 ## ✨ Current Status & Features
@@ -41,14 +38,12 @@ A modern full-stack health application with a NestJS backend API and Next.js fro
 - **User Management**: Complete CRUD operations for user entities with UUID identification
 - **Authentication & Authorization**: Full JWT-based auth system with dual-token strategy
   - JWT Access & Refresh token implementation with automatic rotation
-  - Cookie-based token storage with HTTP-only security
   - Multiple Passport strategies (Local, JWT Access, JWT Refresh)
   - Protected routes with role-based guards
 - **Database Integration**: PostgreSQL with Drizzle ORM and type-safe queries
 - **Security Implementation**: 
   - Argon2 password hashing with salt generation
-  - CORS configuration with credentials support
-  - Secure cookie settings (HTTP-only, SameSite, Secure in production)
+  - CORS configuration with credentials suppor
   - Session tracking with user agent and IP address logging
 - **Input Validation**: Comprehensive validation with Zod schemas and nestjs-zod integration
 - **API Documentation**: REST client files with comprehensive endpoint testing
@@ -65,9 +60,8 @@ A modern full-stack health application with a NestJS backend API and Next.js fro
   - Toast notifications for user feedback
   - Card-based layout with consistent styling
 - **API Integration**: 
-  - Axios-based HTTP client with error handling
   - API proxy routes for backend communication
-  - Cookie-based authentication flow
+  - Cookie-based authentication flow (httpony cookie)
 - **Developer Experience**:
   - TypeScript throughout with strict type checking
   - Hot module replacement for fast development
