@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Field, FieldError, FieldGroup, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 const signInFormSchema = z.object({
   email: z.string().email(),
@@ -16,6 +17,7 @@ const signInFormSchema = z.object({
 export default function SignInForm({
   ...props
 }: React.ComponentProps<typeof Card>) {
+  const router = useRouter();
   const form = useForm({
     defaultValues: {
       email: "",
@@ -36,6 +38,7 @@ export default function SignInForm({
       });
       if (response && response.ok) {
         toast.success("Signed in successfully!");
+        router.refresh();
       } else {
         toast.error("Invalid email or password.");
       }
