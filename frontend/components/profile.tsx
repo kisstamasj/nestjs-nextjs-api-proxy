@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const Profile = ({ session }: { session: SessionPayload | null }) => {
-  console.log("Profile component session:", session);
   const [error, setError] = useState(null);
   const router = useRouter();
 
