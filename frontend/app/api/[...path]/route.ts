@@ -10,10 +10,31 @@ async function getCookieValue(name: string): Promise<string | undefined> {
 }
 
 function createNextResponse(response: Response, body: string): NextResponse {
+  const headers = new Headers(response.headers);
+  
+  // Remove headers that need recalculation
+  headers.delete('content-length');
+  headers.delete('content-encoding');
+  headers.delete('transfer-encoding');
+  
   return new NextResponse(body, {
     status: response.status,
     statusText: response.statusText,
-    headers: response.headers,
+    headers: headers,
+  });
+}
+
+function createStreamingResponse(response: Response): NextResponse {
+  const headers = new Headers(response.headers);
+  
+  // Preserve important headers for file downloads
+  const contentType = response.headers.get('content-type');
+  const contentDisposition = response.headers.get('content-disposition');
+  
+  return new NextResponse(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: headers,
   });
 }
 
@@ -111,6 +132,29 @@ async function forwardRequest(
   return fetch(backendUrl, options);
 }
 
+async function forwardRequestStreaming(
+  request: NextRequest,
+  path: string,
+  accessToken?: string
+): Promise<Response> {
+  const url = new URL(request.url);
+  const backendUrl = `${BACKEND_API_URL}${path}${url.search}`;
+
+  const headers = prepareHeaders(request, accessToken);
+
+  const options: RequestInit = {
+    method: request.method,
+    headers,
+    body: request.body, // Stream the body directly
+    // @ts-ignore - duplex is required for streaming but not in RequestInit type
+    duplex: 'half',
+  };
+
+  console.log("Forwarding streaming request to backend:", backendUrl);
+
+  return fetch(backendUrl, options);
+}
+
 type RouteHandler = (
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> }
@@ -199,6 +243,41 @@ async function handleRequest(
   const pathSegments = resolvedParams?.path || [];
   const fullPath = `/${pathSegments.join("/")}`;
 
+  const contentType = request.headers.get('content-type') || '';
+  
+  // Check if this is a file upload (multipart/form-data) or large request
+  const isFileUpload = contentType.includes('multipart/form-data');
+  const isLargeRequest = contentType.includes('application/octet-stream');
+  
+  // For file uploads or large requests, stream directly without caching
+  if (isFileUpload || isLargeRequest) {
+    let response = await forwardRequestStreaming(request, fullPath, accessToken);
+    
+    // Handle token refresh on 401
+    if (response.status === 401 && sessionPayload && refreshToken) {
+      const refreshResult = await refreshAccessToken(refreshToken);
+      
+      if (!refreshResult) {
+        const errorResponse = NextResponse.json(
+          { error: "Unauthorized - Token refresh failed" },
+          { status: 401 }
+        );
+        errorResponse.cookies.delete(SESSION_TOKEN_COOKIE);
+        return errorResponse;
+      }
+      
+      // Note: Cannot retry file upload as body was already consumed
+      // Client should retry the request
+      return NextResponse.json(
+        { error: "Authentication expired during upload. Please retry." },
+        { status: 401 }
+      );
+    }
+    
+    // For file downloads, stream the response
+    return createStreamingResponse(response);
+  }
+
   // Cache request body before first request (body can only be read once)
   const cachedBody = request.method !== "GET" && request.method !== "HEAD" 
     ? await request.text() 
@@ -230,7 +309,23 @@ async function handleRequest(
     return handleSignOut(response);
   }
 
-  // Forward the response as-is
+  // Check if response is binary/streaming content (file download)
+  const responseContentType = response.headers.get('content-type') || '';
+  const isBinaryResponse = 
+    responseContentType.includes('application/octet-stream') ||
+    responseContentType.includes('application/pdf') ||
+    responseContentType.includes('image/') ||
+    responseContentType.includes('video/') ||
+    responseContentType.includes('audio/') ||
+    responseContentType.includes('application/zip') ||
+    response.headers.get('content-disposition')?.includes('attachment');
+
+  if (isBinaryResponse) {
+    // Stream binary responses directly
+    return createStreamingResponse(response);
+  }
+
+  // Forward the response as-is for text/JSON
   const data = await response.text();
   return createNextResponse(response, data);
 }
