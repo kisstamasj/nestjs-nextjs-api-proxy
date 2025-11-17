@@ -7,7 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { DrizzleService } from 'src/database/drizzle.service';
 import { RequestUser, tokens } from './auth.schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 @Injectable()
 export class AuthService {
@@ -47,31 +47,15 @@ export class AuthService {
     throw new UnauthorizedException('Invalid credentials');
   }
 
-  async signTokens(
+  async createTokens(
     user: RequestUser,
     userAgent: string,
     ipAddress: string,
-    oldRefreshToken?: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const [accessToken, refreshToken] = await Promise.all([
       this.signAccessToken(user),
       this.signRefreshToken(user),
     ]);
-
-    if (oldRefreshToken) {
-      const existingTokens = await this.getTokenByRefreshToken(oldRefreshToken);
-
-      if (existingTokens) {
-        await this.drizzle.db
-          .update(tokens)
-          .set({ refreshToken, accessToken, updatedAt: sql`NOW()` })
-          .where(eq(tokens.refreshToken, oldRefreshToken));
-        return {
-          accessToken,
-          refreshToken,
-        };
-      }
-    }
 
     await this.drizzle.db.insert(tokens).values({
       userId: user.id,
@@ -87,13 +71,114 @@ export class AuthService {
     };
   }
 
-  async getTokenByRefreshToken(refreshToken: string) {
-    const [token] = await this.drizzle.db
+  async rotateTokens(
+    user: RequestUser,
+    currentRefreshToken: string,
+    userAgent: string,
+    ipAddress: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const GRACE_PERIOD_MS = 20 * 1000; // 20 másodperc
+
+    const [newAccessToken, newRefreshToken] = await Promise.all([
+      this.signAccessToken(user),
+      this.signRefreshToken(user),
+    ]);
+
+    // Frissítjük a token rekordot az új tokenekkel, és beállítjuk a previousRefreshToken mezőt
+    await this.drizzle.db
+      .update(tokens)
+      .set({
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        previousRefreshToken: currentRefreshToken,
+        previousRefreshTokenExpiresAt: new Date(Date.now() + GRACE_PERIOD_MS),
+        userAgent,
+        ipAddress,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(tokens.userId, user.id),
+          eq(tokens.refreshToken, currentRefreshToken),
+        ),
+      );
+
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    };
+  }
+
+  async generateNewAccessOnly(
+    user: RequestUser,
+    userAgent: string,
+    ipAddress: string,
+    refreshToken: string,
+  ): Promise<string> {
+    const newAccessToken = await this.signAccessToken(user);
+
+    // Frissítjük csak az access tokent a token rekordban
+    await this.drizzle.db
+      .update(tokens)
+      .set({
+        accessToken: newAccessToken,
+        userAgent,
+        ipAddress,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(tokens.userId, user.id), eq(tokens.refreshToken, refreshToken)),
+      );
+
+    return newAccessToken;
+  }
+
+  async validateRefreshTokenLogic(
+    userId: string,
+    incomingRefreshToken: string,
+  ) {
+    const user = await this.userService.findUserById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // 1. Keressük meg a userhez tartozó token rekordot
+    const tokenRecords = await this.drizzle.db
       .select()
       .from(tokens)
-      .where(eq(tokens.refreshToken, refreshToken));
+      .where(eq(tokens.userId, userId));
 
-    return token;
+    // Mivel a PK-ban van a token, így keresünk a memóriában a rekordok között:
+    const record = tokenRecords.find(
+      (t) =>
+        t.refreshToken === incomingRefreshToken ||
+        t.previousRefreshToken === incomingRefreshToken,
+    );
+
+    if (!record) throw new UnauthorizedException('Token not found');
+
+    // A. ESET: Ez a friss, aktuális token -> OK, mehet tovább a controllerbe rotálni
+    if (record.refreshToken === incomingRefreshToken) {
+      return {
+        user,
+        tokenRecord: record,
+        isGracePeriod: false,
+      };
+    }
+
+    // B. ESET: Grace Period ellenőrzés
+    const now = new Date();
+    if (
+      record.previousRefreshToken === incomingRefreshToken &&
+      record.previousRefreshTokenExpiresAt &&
+      record.previousRefreshTokenExpiresAt > now
+    ) {
+      // FONTOS: Jelezzük, hogy ez Grace Period találat!
+      return { user, tokenRecord: record, isGracePeriod: true };
+    }
+
+    // C. ESET: Lejárt vagy érvénytelen -> A Guard itt fog elhasalni
+    throw new UnauthorizedException('Token expired or reused');
   }
 
   async getTokenByAccessToken(accessToken: string) {
