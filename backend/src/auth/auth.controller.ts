@@ -74,7 +74,9 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt-access'))
   @Get('profile')
   getProfile(@Req() req: RequestWithUser) {
-    return req.user;
+    // dont return tokens
+    const { accessToken, refreshToken, ...userWithoutTokens } = req.user;
+    return userWithoutTokens;
   }
 
   @UseGuards(AuthGuard('jwt-access'))

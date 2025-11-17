@@ -7,11 +7,16 @@ import { SESSION_SECRET, SESSION_TOKEN_COOKIE } from "./config";
 
 const encodedKey = new TextEncoder().encode(SESSION_SECRET);
 
-export interface SessionPayload extends JWTPayload {
+export interface User {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SessionPayload extends JWTPayload, User {
   accessToken: string;
   refreshToken: string;
 }
@@ -42,5 +47,19 @@ export async function getSession() {
     return null;
   }
   const session = await decrypt(sessionToken);
-  return session || null;
+
+  if(!session) {
+    return null;
+  }
+
+  const user: User = {
+    id: session.id,
+    email: session.email,
+    firstName: session.firstName,
+    lastName: session.lastName,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+  }
+  
+  return user;
 }

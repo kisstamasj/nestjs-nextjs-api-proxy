@@ -206,13 +206,15 @@ async function handleSignIn(response: Response): Promise<NextResponse> {
   const data = await response.json();
   const nextResponse = createNextResponse(response, JSON.stringify(data));
 
-  const { accessToken, refreshToken, id, email, firstName, lastName } = data;
+  const { accessToken, refreshToken, id, email, firstName, lastName, createdAt, updatedAt } = data;
 
-  const sessionPayload = {
+  const sessionPayload: SessionPayload = {
     id,
     email,
     firstName,
     lastName,
+    createdAt,
+    updatedAt,
     accessToken,
     refreshToken,
   };
