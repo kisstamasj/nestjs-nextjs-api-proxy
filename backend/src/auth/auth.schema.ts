@@ -16,6 +16,10 @@ export const tokens = pgTable(
       .references(() => users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
     accessToken: text('access_token').notNull(),
     refreshToken: text('refresh_token').notNull(),
+    previousRefreshToken: text('previous_refresh_token'),
+    previousRefreshTokenExpiresAt: timestamp(
+      'previous_refresh_token_expires_at',
+    ),
     userAgent: text('user_agent').notNull(),
     ipAddress: text('ip_address').notNull(),
     createdAt: timestamp('created_at').defaultNow(),
@@ -28,6 +32,8 @@ export const tokens = pgTable(
     }),
   ],
 );
+
+export type Token = typeof tokens.$inferSelect;
 
 export type RequestUser = User & {
   refreshToken?: string;
