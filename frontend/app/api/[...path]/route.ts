@@ -89,7 +89,8 @@ function prepareHeaders(request: NextRequest, accessToken?: string): Headers {
 async function forwardRequest(
   request: NextRequest,
   path: string,
-  accessToken?: string
+  accessToken?: string,
+  cachedBody?: string
 ): Promise<Response> {
   const url = new URL(request.url);
   const backendUrl = `${BACKEND_API_URL}${path}${url.search}`;
@@ -101,8 +102,8 @@ async function forwardRequest(
     headers,
   };
 
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    options.body = await request.text();
+  if (cachedBody !== undefined) {
+    options.body = cachedBody;
   }
 
   console.log("Forwarding request to backend:", backendUrl);
@@ -129,7 +130,8 @@ async function handleTokenRefresh(
   request: NextRequest,
   fullPath: string,
   sessionPayload: SessionPayload,
-  refreshToken: string
+  refreshToken: string,
+  cachedBody?: string
 ): Promise<NextResponse | null> {
   const refreshResult = await refreshAccessToken(refreshToken);
 
@@ -142,7 +144,7 @@ async function handleTokenRefresh(
     return errorResponse;
   }
 
-  const response = await forwardRequest(request, fullPath, refreshResult.access_token);
+  const response = await forwardRequest(request, fullPath, refreshResult.access_token, cachedBody);
   const data = await response.text();
   const nextResponse = createNextResponse(response, data);
 
@@ -197,7 +199,12 @@ async function handleRequest(
   const pathSegments = resolvedParams?.path || [];
   const fullPath = `/${pathSegments.join("/")}`;
 
-  let response = await forwardRequest(request, fullPath, accessToken);
+  // Cache request body before first request (body can only be read once)
+  const cachedBody = request.method !== "GET" && request.method !== "HEAD" 
+    ? await request.text() 
+    : undefined;
+
+  let response = await forwardRequest(request, fullPath, accessToken, cachedBody);
 
   // Handle token refresh on 401
   if (response.status === 401 && sessionPayload && refreshToken) {
@@ -205,10 +212,11 @@ async function handleRequest(
       request,
       fullPath,
       sessionPayload,
-      refreshToken
+      refreshToken,
+      cachedBody
     );
     if (refreshedResponse) {
-      return refreshedResponse;
+      response = refreshedResponse;
     }
   }
 
