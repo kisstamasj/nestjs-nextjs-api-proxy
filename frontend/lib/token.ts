@@ -1,6 +1,6 @@
-export const ACCESS_TOKEN_COOKIE = "access_token";
-export const REFRESH_TOKEN_COOKIE = "refresh_token";
-export const SESSION_TOKEN_COOKIE = "session_token";
+import { SESSION_TOKEN_COOKIE } from "./config";
+
+
 
 const getTokenOptions = (name: string, value: string, maxAge: number) => {
   return {

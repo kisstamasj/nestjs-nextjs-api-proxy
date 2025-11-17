@@ -2,10 +2,10 @@
 
 import { JWTPayload, jwtVerify, SignJWT } from "jose";
 import { cookies } from "next/headers";
-import { SESSION_TOKEN_COOKIE } from "./token";
+import { SESSION_SECRET, SESSION_TOKEN_COOKIE } from "./config";
 
-const secretKey = process.env.SESSION_SECRET;
-const encodedKey = new TextEncoder().encode(secretKey);
+
+const encodedKey = new TextEncoder().encode(SESSION_SECRET);
 
 export interface SessionPayload extends JWTPayload {
   id: string;

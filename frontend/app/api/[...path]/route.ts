@@ -1,9 +1,8 @@
-import { BACKEND_API_URL } from "@/lib/config";
+import { BACKEND_API_URL, REFRESH_ENDPOINT, SESSION_TOKEN_COOKIE } from "@/lib/config";
 import { decrypt, encrypt } from "@/lib/session";
-import { getSessionTokenOption, SESSION_TOKEN_COOKIE } from "@/lib/token";
+import { getSessionTokenOption } from "@/lib/token";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-const REFRESH_ENDPOINT = "/auth/refresh"; // Adjust to your refresh endpoint
 
 // Helper to get cookies from either request or server context
 async function getCookieValue(name: string): Promise<string | undefined> {
