@@ -1,9 +1,9 @@
 import SignInForm from "@/components/sign-in-form";
-import { getSession } from "@/lib/session";
+import { getUserSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 
 export default async function SignInPage() {
-  const session = await getSession();
+  const session = await getUserSession();
   if (session) {
     redirect("/");
   }

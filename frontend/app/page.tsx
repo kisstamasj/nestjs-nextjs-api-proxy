@@ -1,5 +1,5 @@
 import Profile from "@/components/profile";
-import { getSession } from "@/lib/session";
+import { getUserSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const session = await getSession();
+  const session = await getUserSession();
   if (!session) {
     redirect("/sign-in");
   }

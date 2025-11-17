@@ -40,7 +40,7 @@ export async function decrypt(session: string | undefined = "") {
   }
 }
 
-export async function getSession() {
+export async function getUserSession() {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(SESSION_TOKEN_COOKIE)?.value;
   if (!sessionToken) {
