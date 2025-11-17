@@ -60,7 +60,9 @@ interface RefreshResponse {
 }
 
 async function refreshAccessToken(
-  refreshToken: string
+  refreshToken: string,
+  userAgent: string,
+  ipAddress: string
 ): Promise<RefreshResponse | null> {
   try {
     console.log("Attempting to refresh access token");
@@ -69,6 +71,8 @@ async function refreshAccessToken(
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${refreshToken}`,
+        "user-agent": userAgent,
+        "x-forwarded-for": ipAddress,
       },
     });
 
@@ -179,7 +183,11 @@ async function handleTokenRefresh(
   refreshToken: string,
   cachedBody?: string
 ): Promise<NextResponse | null> {
-  const refreshResult = await refreshAccessToken(refreshToken);
+  const refreshResult = await refreshAccessToken(
+    refreshToken,
+    request.headers.get("user-agent") || "unknown",
+    request.headers.get("x-forwarded-for") || "unknown"
+  );
 
   if (!refreshResult) {
     const errorResponse = NextResponse.json(
@@ -277,7 +285,11 @@ async function handleRequest(
 
     // Handle token refresh on 401
     if (response.status === 401 && sessionPayload && refreshToken) {
-      const refreshResult = await refreshAccessToken(refreshToken);
+      const refreshResult = await refreshAccessToken(
+        refreshToken,
+        request.headers.get("user-agent") || "unknown",
+        request.headers.get("x-forwarded-for") || "unknown"
+      );
 
       if (!refreshResult) {
         const errorResponse = NextResponse.json(
