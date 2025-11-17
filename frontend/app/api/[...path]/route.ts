@@ -1,19 +1,39 @@
 import { BACKEND_API_URL, REFRESH_ENDPOINT, SESSION_TOKEN_COOKIE, SIGN_IN_ENDPOINT, SIGN_OUT_ENDPOINT } from "@/lib/config";
-import { decrypt, encrypt } from "@/lib/session";
+import { decrypt, encrypt, SessionPayload } from "@/lib/session";
 import { getSessionTokenOption } from "@/lib/token";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-// Helper to get cookies from either request or server context
 async function getCookieValue(name: string): Promise<string | undefined> {
   const cookieStore = await cookies();
   return cookieStore.get(name)?.value;
 }
 
+function createNextResponse(response: Response, body: string): NextResponse {
+  return new NextResponse(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
+async function updateSessionCookie(
+  response: NextResponse,
+  sessionPayload: SessionPayload,
+  accessToken: string,
+  refreshToken: string
+): Promise<void> {
+  const encryptedSession = await encrypt({
+    ...sessionPayload,
+    accessToken,
+    refreshToken,
+  });
+  response.cookies.set(getSessionTokenOption(encryptedSession));
+}
+
 interface RefreshResponse {
   access_token: string;
   refresh_token: string;
-  expires_in?: number;
 }
 
 async function refreshAccessToken(
@@ -43,6 +63,29 @@ async function refreshAccessToken(
   }
 }
 
+function prepareHeaders(request: NextRequest, accessToken?: string): Headers {
+  const headers = new Headers(request.headers);
+  
+  if (accessToken) {
+    headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  const userAgent = request.headers.get("user-agent");
+  if (userAgent) {
+    headers.set("user-agent", userAgent);
+  }
+
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    headers.set("x-forwarded-for", forwardedFor);
+  }
+
+  headers.delete("host");
+  headers.delete("cookie");
+
+  return headers;
+}
+
 async function forwardRequest(
   request: NextRequest,
   path: string,
@@ -51,32 +94,13 @@ async function forwardRequest(
   const url = new URL(request.url);
   const backendUrl = `${BACKEND_API_URL}${path}${url.search}`;
 
-  // Get headers and add authorization
-  const headers = new Headers(request.headers);
-  if (accessToken) {
-    headers.set("Authorization", `Bearer ${accessToken}`);
-  }
-
-  // forward user-agent header
-  if (request.headers.get("user-agent")) {
-    headers.set("user-agent", request.headers.get("user-agent")!);
-  }
-
-  // forward ip address header
-  if (request.headers.get("x-forwarded-for")) {
-    headers.set("x-forwarded-for", request.headers.get("x-forwarded-for")!);
-  }
-
-  // Remove host and cookie headers to avoid conflicts
-  headers.delete("host");
-  headers.delete("cookie");
+  const headers = prepareHeaders(request, accessToken);
 
   const options: RequestInit = {
     method: request.method,
     headers,
   };
 
-  // Add body for methods that support it
   if (request.method !== "GET" && request.method !== "HEAD") {
     options.body = await request.text();
   }
@@ -86,155 +110,119 @@ async function forwardRequest(
   return fetch(backendUrl, options);
 }
 
-export async function GET(
+type RouteHandler = (
   request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
-  return handleRequest(request, params);
+  context: { params: Promise<{ path: string[] }> }
+) => Promise<NextResponse>;
+
+const createHandler: RouteHandler = (request, { params }) => 
+  handleRequest(request, params);
+
+export const GET = createHandler;
+export const POST = createHandler;
+export const PUT = createHandler;
+export const DELETE = createHandler;
+export const PATCH = createHandler;
+export const OPTIONS = createHandler;
+
+async function handleTokenRefresh(
+  request: NextRequest,
+  fullPath: string,
+  sessionPayload: SessionPayload,
+  refreshToken: string
+): Promise<NextResponse | null> {
+  const refreshResult = await refreshAccessToken(refreshToken);
+
+  if (!refreshResult) {
+    const errorResponse = NextResponse.json(
+      { error: "Unauthorized - Token refresh failed" },
+      { status: 401 }
+    );
+    errorResponse.cookies.delete(SESSION_TOKEN_COOKIE);
+    return errorResponse;
+  }
+
+  const response = await forwardRequest(request, fullPath, refreshResult.access_token);
+  const data = await response.text();
+  const nextResponse = createNextResponse(response, data);
+
+  await updateSessionCookie(
+    nextResponse,
+    sessionPayload,
+    refreshResult.access_token,
+    refreshResult.refresh_token
+  );
+
+  return nextResponse;
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
-  return handleRequest(request, params);
+async function handleSignIn(response: Response): Promise<NextResponse> {
+  const data = await response.json();
+  const nextResponse = createNextResponse(response, JSON.stringify(data));
+
+  const { accessToken, refreshToken, id, email, firstName, lastName } = data;
+
+  const sessionPayload = {
+    id,
+    email,
+    firstName,
+    lastName,
+    accessToken,
+    refreshToken,
+  };
+
+  const encryptedSession = await encrypt(sessionPayload);
+  nextResponse.cookies.set(getSessionTokenOption(encryptedSession));
+
+  return nextResponse;
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
-  return handleRequest(request, params);
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
-  return handleRequest(request, params);
-}
-
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
-  return handleRequest(request, params);
-}
-
-export async function OPTIONS(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
-  return handleRequest(request, params);
+async function handleSignOut(response: Response): Promise<NextResponse> {
+  const data = await response.text();
+  const nextResponse = createNextResponse(response, data);
+  nextResponse.cookies.delete(SESSION_TOKEN_COOKIE);
+  return nextResponse;
 }
 
 async function handleRequest(
   request: NextRequest,
   params: Promise<{ path: string[] }>
 ) {
-  // Get cookies from either request or server context
   const sessionToken = await getCookieValue(SESSION_TOKEN_COOKIE);
   const sessionPayload = sessionToken ? await decrypt(sessionToken) : undefined;
-  let accessToken = sessionPayload?.accessToken || undefined;
-  const refreshToken = sessionPayload?.refreshToken || undefined;
-
-  console.log("Session payload:", sessionPayload);
+  const accessToken = sessionPayload?.accessToken;
+  const refreshToken = sessionPayload?.refreshToken;
 
   const resolvedParams = await params;
   const pathSegments = resolvedParams?.path || [];
   const fullPath = `/${pathSegments.join("/")}`;
 
-  // First attempt with current access token
   let response = await forwardRequest(request, fullPath, accessToken);
 
-  // If unauthorized (401), try to refresh the token
+  // Handle token refresh on 401
   if (response.status === 401 && sessionPayload && refreshToken) {
-    const refreshResult = await refreshAccessToken(refreshToken);
-
-    if (refreshResult) {
-      // Update tokens
-      accessToken = refreshResult.access_token;
-
-      // Retry the original request with new token
-      response = await forwardRequest(request, fullPath, accessToken);
-
-      // Create response with updated cookies
-      const data = await response.text();
-      const nextResponse = new NextResponse(data, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-      });
-
-      const encryptedSession = await encrypt({
-        ...sessionPayload,
-        accessToken: refreshResult.access_token,
-        refreshToken: refreshResult.refresh_token,
-      });
-
-      nextResponse.cookies.set(getSessionTokenOption(encryptedSession));
-
-      return nextResponse;
-    } else {
-      // Refresh failed - clear cookies and return unauthorized
-      const errorResponse = NextResponse.json(
-        { error: "Unauthorized - Token refresh failed" },
-        { status: 401 }
-      );
-
-      errorResponse.cookies.delete(SESSION_TOKEN_COOKIE);
-      return errorResponse;
+    const refreshedResponse = await handleTokenRefresh(
+      request,
+      fullPath,
+      sessionPayload,
+      refreshToken
+    );
+    if (refreshedResponse) {
+      return refreshedResponse;
     }
   }
 
-  if( fullPath === SIGN_IN_ENDPOINT && response.ok) {
-    const data = await response.json();
-    const nextResponse = new NextResponse(JSON.stringify(data), {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-    });
-
-    const { accessToken, refreshToken, id, email, firstName, lastName } = data;
-
-    const sessionPayload = {
-      id,
-      email,
-      firstName,
-      lastName,
-      accessToken,
-      refreshToken,
-    };
-
-    const encryptedSession = await encrypt(sessionPayload);
-
-    // Set HttpOnly cookies
-    nextResponse.cookies.set(getSessionTokenOption(encryptedSession));
-
-    return nextResponse;
+  // Handle sign-in endpoint
+  if (fullPath === SIGN_IN_ENDPOINT && response.ok) {
+    return handleSignIn(response);
   }
 
-  // if signed out, clear cookies
+  // Handle sign-out endpoint
   if (fullPath === SIGN_OUT_ENDPOINT && response.ok) {
-    const data = await response.text();
-    const nextResponse = new NextResponse(data, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-    });
-
-    nextResponse.cookies.delete(SESSION_TOKEN_COOKIE);
-
-    return nextResponse;
+    return handleSignOut(response);
   }
 
   // Forward the response as-is
   const data = await response.text();
-  const nextResponse = new NextResponse(data, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: response.headers,
-  });
-
-  return nextResponse;
+  return createNextResponse(response, data);
 }
