@@ -42,10 +42,16 @@ export default function SignUpForm({
           "Content-Type": "application/json",
         },
         body: JSON.stringify(value),
-      });
-      if (response.ok) {
+      })
+      if (response?.ok) {
         toast.success("Account created successfully! Please sign in.");
       } else {
+          // handle conflict error
+          if (response.status === 409) {
+          
+          toast.error("An account with this email already exists.");
+          return;
+        }
         toast.error("An error occurred while creating the account.");
       }
     },
