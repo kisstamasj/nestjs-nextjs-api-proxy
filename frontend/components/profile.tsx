@@ -17,7 +17,7 @@ const Profile = ({ session }: { session: SessionPayload | null }) => {
 
   const fetchProfile = async () => {
     try {
-      const response = await fetch("/api/auth/profile");
+      const response = await fetch("/api/auth/me");
       if (!response.ok) {
         throw new Error("Failed to fetch profile");
       }
