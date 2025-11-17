@@ -1,12 +1,12 @@
 "use client";
 
-import { SessionPayload } from "@/lib/session";
+import { User } from "@/lib/session";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-const Profile = ({ session }: { session: SessionPayload | null }) => {
+const Profile = ({ session }: { session: User | null }) => {
   const router = useRouter();
-  const [profileData, setProfileData] = useState<SessionPayload | null>(null);
+  const [profileData, setProfileData] = useState<User | null>(null);
 
   const signOut = async () => {
     await fetch("/api/auth/sign-out", {
