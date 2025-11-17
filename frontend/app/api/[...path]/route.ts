@@ -1,4 +1,4 @@
-import { BACKEND_API_URL, REFRESH_ENDPOINT, SESSION_TOKEN_COOKIE } from "@/lib/config";
+import { BACKEND_API_URL, REFRESH_ENDPOINT, SESSION_TOKEN_COOKIE, SIGN_IN_ENDPOINT, SIGN_OUT_ENDPOINT } from "@/lib/config";
 import { decrypt, encrypt } from "@/lib/session";
 import { getSessionTokenOption } from "@/lib/token";
 import { cookies } from "next/headers";
@@ -138,6 +138,8 @@ async function handleRequest(
   let accessToken = sessionPayload?.accessToken || undefined;
   const refreshToken = sessionPayload?.refreshToken || undefined;
 
+  console.log("Session payload:", sessionPayload);
+
   const resolvedParams = await params;
   const pathSegments = resolvedParams?.path || [];
   const fullPath = `/${pathSegments.join("/")}`;
@@ -185,8 +187,35 @@ async function handleRequest(
     }
   }
 
+  if( fullPath === SIGN_IN_ENDPOINT && response.ok) {
+    const data = await response.json();
+    const nextResponse = new NextResponse(JSON.stringify(data), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+
+    const { accessToken, refreshToken, id, email, firstName, lastName } = data;
+
+    const sessionPayload = {
+      id,
+      email,
+      firstName,
+      lastName,
+      accessToken,
+      refreshToken,
+    };
+
+    const encryptedSession = await encrypt(sessionPayload);
+
+    // Set HttpOnly cookies
+    nextResponse.cookies.set(getSessionTokenOption(encryptedSession));
+
+    return nextResponse;
+  }
+
   // if signed out, clear cookies
-  if (fullPath === "/auth/sign-out" && response.ok) {
+  if (fullPath === SIGN_OUT_ENDPOINT && response.ok) {
     const data = await response.text();
     const nextResponse = new NextResponse(data, {
       status: response.status,
