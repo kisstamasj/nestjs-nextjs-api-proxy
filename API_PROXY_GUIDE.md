@@ -29,15 +29,49 @@ This API proxy is a **Next.js Route Handler** that acts as an intermediary betwe
 
 ## Architecture
 
+```mermaid
+graph LR
+    A[Browser<br/>Frontend] -->|HTTP Request<br/>/api/*| B[Next.js Proxy<br/>/api/...path]
+    B -->|Server-to-Server<br/>with Authorization| C[Backend API<br/>NestJS]
+    C -->|Response| B
+    B -->|Response +<br/>Set-Cookie| A
+    A -.->|session_token<br/>HTTP-only cookie| B
+    
+    style A fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style B fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style C fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
 ```
-┌─────────────┐         ┌──────────────────┐         ┌─────────────┐
-│   Browser   │────────▶│  Next.js Proxy   │────────▶│   Backend   │
-│  (Frontend) │         │   /api/[...path] │         │   (NestJS)  │
-└─────────────┘         └──────────────────┘         └─────────────┘
-      ▲                          │                            │
-      │                          │                            │
-      └──────────────────────────┴────────────────────────────┘
-           Encrypted session cookie (HTTP-only)
+
+**Flow Overview:**
+```mermaid
+flowchart LR
+    subgraph Client ["Client Side"]
+        Browser[Browser/React]
+    end
+    
+    subgraph Proxy ["Next.js Server (Proxy Layer)"]
+        Handler[Route Handler<br/>/api/...path]
+        Session[Session Management<br/>JWT Encryption]
+        Token[Token Refresh Logic]
+    end
+    
+    subgraph Backend ["Backend Services"]
+        API[NestJS API]
+        Auth[Auth Service]
+        DB[(Database)]
+    end
+    
+    Browser <-->|1. API Calls| Handler
+    Handler <--> Session
+    Handler <--> Token
+    Handler <-->|2. Forwarded Requests| API
+    API <--> Auth
+    Auth <--> DB
+    Session -.->|Encrypted Cookie| Browser
+    
+    style Client fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Proxy fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style Backend fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
 ```
 
 ### Why Use a Proxy?
@@ -522,77 +556,67 @@ export const getSessionTokenOption = (sessionPayload: string) => {
 
 ### Complete Sign-In Sequence
 
-```
-┌─────────┐                   ┌──────────┐                    ┌─────────┐
-│ Browser │                   │  Proxy   │                    │ Backend │
-└────┬────┘                   └────┬─────┘                    └────┬────┘
-     │                             │                               │
-     │ POST /api/auth/sign-in      │                               │
-     ├────────────────────────────▶│                               │
-     │ { email, password }          │                               │
-     │                             │ POST /auth/sign-in            │
-     │                             ├──────────────────────────────▶│
-     │                             │                               │
-     │                             │ 200 OK                        │
-     │                             │ { accessToken, refreshToken,  │
-     │                             │   id, email, firstName, ... } │
-     │                             │◀──────────────────────────────┤
-     │                             │                               │
-     │                             │ [Encrypt all data]            │
-     │                             │ [Create session JWT]          │
-     │                             │                               │
-     │ 200 OK                      │                               │
-     │ Set-Cookie: session_token=  │                               │
-     │   eyJhbGc... (encrypted)    │                               │
-     │◀────────────────────────────┤                               │
-     │                             │                               │
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Proxy as Next.js Proxy
+    participant Backend as NestJS Backend
+    
+    Browser->>Proxy: POST /api/auth/sign-in<br/>{email, password}
+    activate Proxy
+    Proxy->>Backend: POST /auth/sign-in<br/>{email, password}
+    activate Backend
+    Backend->>Backend: Validate credentials
+    Backend->>Backend: Generate accessToken<br/>Generate refreshToken
+    Backend-->>Proxy: 200 OK<br/>{accessToken, refreshToken,<br/>id, email, firstName, lastName}
+    deactivate Backend
+    Proxy->>Proxy: Extract tokens & user data
+    Proxy->>Proxy: Create SessionPayload
+    Proxy->>Proxy: Encrypt with HS256 JWT<br/>Expires: 7 days
+    Proxy-->>Browser: 200 OK + Response body<br/>Set-Cookie: session_token=eyJhbGc...<br/>(httpOnly, secure, sameSite:strict)
+    deactivate Proxy
+    Note over Browser,Proxy: Session established<br/>Cookie stored securely
 ```
 
 ### Authenticated Request with Refresh
 
-```
-┌─────────┐                   ┌──────────┐                    ┌─────────┐
-│ Browser │                   │  Proxy   │                    │ Backend │
-└────┬────┘                   └────┬─────┘                    └────┬────┘
-     │                             │                               │
-     │ GET /api/users              │                               │
-     ├────────────────────────────▶│                               │
-     │ Cookie: session_token=...   │ [Decrypt session]             │
-     │                             │ [Extract accessToken]         │
-     │                             │                               │
-     │                             │ GET /users                    │
-     │                             │ Authorization: Bearer <token> │
-     │                             ├──────────────────────────────▶│
-     │                             │                               │
-     │                             │ 401 Unauthorized              │
-     │                             │ (access token expired)        │
-     │                             │◀──────────────────────────────┤
-     │                             │                               │
-     │                             │ [Extract refreshToken]        │
-     │                             │                               │
-     │                             │ POST /auth/refresh            │
-     │                             │ Authorization: Bearer <refresh>│
-     │                             ├──────────────────────────────▶│
-     │                             │                               │
-     │                             │ 200 OK                        │
-     │                             │ { access_token, refresh_token }│
-     │                             │◀──────────────────────────────┤
-     │                             │                               │
-     │                             │ GET /users (RETRY)            │
-     │                             │ Authorization: Bearer <new>   │
-     │                             ├──────────────────────────────▶│
-     │                             │                               │
-     │                             │ 200 OK                        │
-     │                             │ [user data]                   │
-     │                             │◀──────────────────────────────┤
-     │                             │                               │
-     │                             │ [Update session cookie]       │
-     │                             │                               │
-     │ 200 OK                      │                               │
-     │ Set-Cookie: session_token=  │                               │
-     │   <updated with new tokens> │                               │
-     │◀────────────────────────────┤                               │
-     │                             │                               │
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Proxy as Next.js Proxy
+    participant Backend as NestJS Backend
+    
+    Browser->>Proxy: GET /api/users<br/>Cookie: session_token=...
+    activate Proxy
+    Proxy->>Proxy: Decrypt session cookie
+    Proxy->>Proxy: Extract accessToken (expired)
+    Proxy->>Backend: GET /users<br/>Authorization: Bearer <expired_token>
+    activate Backend
+    Backend-->>Proxy: 401 Unauthorized<br/>(Token expired)
+    deactivate Backend
+    
+    rect rgb(255, 243, 224)
+        Note over Proxy: Token Refresh Flow
+        Proxy->>Proxy: Extract refreshToken from session
+        Proxy->>Backend: POST /auth/refresh<br/>Authorization: Bearer <refresh_token>
+        activate Backend
+        Backend->>Backend: Validate refresh token
+        Backend-->>Proxy: 200 OK<br/>{access_token, refresh_token}
+        deactivate Backend
+    end
+    
+    rect rgb(232, 245, 233)
+        Note over Proxy,Backend: Retry Original Request
+        Proxy->>Backend: GET /users (RETRY)<br/>Authorization: Bearer <new_token>
+        activate Backend
+        Backend-->>Proxy: 200 OK<br/>[user data]
+        deactivate Backend
+    end
+    
+    Proxy->>Proxy: Update session cookie<br/>with new tokens
+    Proxy-->>Browser: 200 OK + [user data]<br/>Set-Cookie: session_token=<updated>
+    deactivate Proxy
+    Note over Browser,Proxy: User never noticed<br/>token was refreshed!
 ```
 
 ---
