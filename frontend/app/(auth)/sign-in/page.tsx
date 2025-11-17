@@ -2,10 +2,10 @@ import SignInForm from "@/components/sign-in-form";
 import { getSession } from "@/lib/session";
 import { redirect } from "next/navigation";
 
-export default async function SignInPage() {
+export default async function Page() {
   const session = await getSession();
   if (session) {
-    return redirect("/");
+    redirect("/");
   }
   return (
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
