@@ -1,23 +1,16 @@
 import { SESSION_TOKEN_COOKIE } from "./config";
 
-
-
-const getTokenOptions = (name: string, value: string, maxAge: number) => {
+export const getSessionTokenOption = (
+  sessionPayload: string,
+  maxAge?: number
+) => {
   return {
-    name,
-    value,
+    name: SESSION_TOKEN_COOKIE,
+    value: sessionPayload,
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict" as const,
     path: "/",
-    maxAge,
+    maxAge: maxAge || undefined, // If maxAge is not provided, the cookie will be a session cookie
   };
-};
-
-export const getSessionTokenOption = (sessionPayload: string) => {
-  return getTokenOptions(
-    SESSION_TOKEN_COOKIE,
-    sessionPayload,
-    7 * 24 * 60 * 60 // seconds in 7 days
-  );
 };
