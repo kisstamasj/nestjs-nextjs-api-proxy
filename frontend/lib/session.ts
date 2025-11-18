@@ -52,14 +52,6 @@ export async function getUserSession() {
     return null;
   }
 
-  const user: User = {
-    id: session.id,
-    email: session.email,
-    firstName: session.firstName,
-    lastName: session.lastName,
-    createdAt: session.createdAt,
-    updatedAt: session.updatedAt,
-  }
-  
-  return user;
+  const { accessToken, refreshToken, ...user } = session;
+  return user as User;
 }
