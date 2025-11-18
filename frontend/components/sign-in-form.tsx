@@ -8,10 +8,13 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "./ui/field";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { Checkbox } from "./ui/checkbox";
+import { Label } from "./ui/label";
 
 const signInFormSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  rememberMe: z.boolean(),
 });
 
 export default function SignInForm({
@@ -22,6 +25,7 @@ export default function SignInForm({
     defaultValues: {
       email: "",
       password: "",
+      rememberMe: false,
     },
     validators: {
       onSubmit: signInFormSchema,
@@ -112,6 +116,21 @@ export default function SignInForm({
                   </Field>
                 );
               }}
+            </form.Field>
+          </FieldGroup>
+
+          <FieldGroup>
+            <form.Field name="rememberMe">
+              {(field) => (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="terms"
+                    checked={field.state.value}
+                    onCheckedChange={(checked) => field.handleChange(!!checked)}
+                  />
+                  <Label htmlFor="terms">Remember me</Label>
+                </div>
+              )}
             </form.Field>
           </FieldGroup>
 

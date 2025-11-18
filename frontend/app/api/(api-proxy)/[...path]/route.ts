@@ -271,7 +271,10 @@ async function handleTokenRefresh(
  * @param response - The Response from the sign-in endpoint
  * @returns NextResponse with the session cookie set
  */
-async function handleSignIn(response: Response): Promise<NextResponse> {
+async function handleSignIn(
+  response: Response,
+  rememberMe?: boolean
+): Promise<NextResponse> {
   const data = await response.json();
   const nextResponse = createNextResponse(response, JSON.stringify(data));
 
@@ -298,7 +301,16 @@ async function handleSignIn(response: Response): Promise<NextResponse> {
   };
 
   const encryptedSession = await encrypt(sessionPayload);
-  nextResponse.cookies.set(getSessionTokenOption(encryptedSession));
+  console.log("data:", data);
+  if (rememberMe) {
+    // Persistent cookie (expires in 7 days)
+    nextResponse.cookies.set(
+      getSessionTokenOption(encryptedSession, 7 * 24 * 60 * 60) // 7 days
+    );
+  } else {
+    // Session cookie (expires when browser closes)
+    nextResponse.cookies.set(getSessionTokenOption(encryptedSession));
+  }
 
   return nextResponse;
 }
@@ -406,7 +418,10 @@ async function handleRequest(
 
   // Handle sign-in endpoint
   if (fullPath === SIGN_IN_ENDPOINT && response.ok) {
-    return handleSignIn(response);
+    return handleSignIn(
+      response,
+      (cachedBody && JSON.parse(cachedBody).rememberMe) || false
+    );
   }
 
   // Handle sign-out endpoint
