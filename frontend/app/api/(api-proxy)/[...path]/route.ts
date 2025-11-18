@@ -10,11 +10,31 @@ import { getSessionTokenOption } from "@/lib/token";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
+type RouteHandler = (
+  request: NextRequest,
+  context: { params: Promise<{ path: string[] }> }
+) => Promise<NextResponse>;
+interface RefreshResponse {
+  access_token: string;
+  refresh_token: string;
+}
+
+/**
+ * Retrieves a cookie value by name from the Next.js cookie store.
+ * @param name - The name of the cookie to retrieve
+ * @returns The cookie value or undefined if not found
+ */
 async function getCookieValue(name: string): Promise<string | undefined> {
   const cookieStore = await cookies();
   return cookieStore.get(name)?.value;
 }
 
+/**
+ * Creates a NextResponse from a fetch Response with text body, removing headers that need recalculation.
+ * @param response - The fetch Response object
+ * @param body - The response body as a string
+ * @returns A NextResponse object with cleaned headers
+ */
 function createNextResponse(response: Response, body: string): NextResponse {
   const headers = new Headers(response.headers);
 
@@ -30,6 +50,11 @@ function createNextResponse(response: Response, body: string): NextResponse {
   });
 }
 
+/**
+ * Creates a streaming NextResponse from a fetch Response, preserving the response body stream.
+ * @param response - The fetch Response object with a streaming body
+ * @returns A NextResponse object that streams the response body
+ */
 function createStreamingResponse(response: Response): NextResponse {
   const headers = new Headers(response.headers);
 
@@ -40,6 +65,13 @@ function createStreamingResponse(response: Response): NextResponse {
   });
 }
 
+/**
+ * Updates the session cookie with new access and refresh tokens.
+ * @param response - The NextResponse object to set the cookie on
+ * @param sessionPayload - The session data containing user information
+ * @param accessToken - The new access token
+ * @param refreshToken - The new refresh token
+ */
 async function updateSessionCookie(
   response: NextResponse,
   sessionPayload: SessionPayload,
@@ -54,11 +86,13 @@ async function updateSessionCookie(
   response.cookies.set(getSessionTokenOption(encryptedSession));
 }
 
-interface RefreshResponse {
-  access_token: string;
-  refresh_token: string;
-}
-
+/**
+ * Refreshes the access token using the refresh token by calling the backend refresh endpoint.
+ * @param refreshToken - The refresh token to use for authentication
+ * @param userAgent - The user agent string from the original request
+ * @param ipAddress - The IP address from the original request
+ * @returns The new access and refresh tokens, or null if refresh failed
+ */
 async function refreshAccessToken(
   refreshToken: string,
   userAgent: string,
@@ -90,6 +124,12 @@ async function refreshAccessToken(
   }
 }
 
+/**
+ * Prepares request headers for forwarding to the backend, adding authorization and removing sensitive headers.
+ * @param request - The incoming NextRequest object
+ * @param accessToken - Optional access token to add to the Authorization header
+ * @returns Prepared Headers object for the backend request
+ */
 function prepareHeaders(request: NextRequest, accessToken?: string): Headers {
   const headers = new Headers(request.headers);
 
@@ -113,6 +153,14 @@ function prepareHeaders(request: NextRequest, accessToken?: string): Headers {
   return headers;
 }
 
+/**
+ * Forwards a request to the backend API with optional body caching for retry scenarios.
+ * @param request - The incoming NextRequest object
+ * @param path - The API path to forward to
+ * @param accessToken - Optional access token for authentication
+ * @param cachedBody - Optional cached request body for retries
+ * @returns The Response from the backend API
+ */
 async function forwardRequest(
   request: NextRequest,
   path: string,
@@ -138,6 +186,13 @@ async function forwardRequest(
   return fetch(backendUrl, options);
 }
 
+/**
+ * Forwards a streaming request to the backend API for file uploads or large payloads.
+ * @param request - The incoming NextRequest object with streaming body
+ * @param path - The API path to forward to
+ * @param accessToken - Optional access token for authentication
+ * @returns The Response from the backend API
+ */
 async function forwardRequestStreaming(
   request: NextRequest,
   path: string,
@@ -161,21 +216,15 @@ async function forwardRequestStreaming(
   return fetch(backendUrl, options);
 }
 
-type RouteHandler = (
-  request: NextRequest,
-  context: { params: Promise<{ path: string[] }> }
-) => Promise<NextResponse>;
-
-const createHandler: RouteHandler = (request, { params }) =>
-  handleRequest(request, params);
-
-export const GET = createHandler;
-export const POST = createHandler;
-export const PUT = createHandler;
-export const DELETE = createHandler;
-export const PATCH = createHandler;
-export const OPTIONS = createHandler;
-
+/**
+ * Handles token refresh when a 401 is received, retries the original request with the new token.
+ * @param request - The incoming NextRequest object
+ * @param fullPath - The full API path being requested
+ * @param sessionPayload - The current session data
+ * @param refreshToken - The refresh token to use
+ * @param cachedBody - Optional cached request body for the retry
+ * @returns The NextResponse with updated session cookie, or null if refresh failed
+ */
 async function handleTokenRefresh(
   request: NextRequest,
   fullPath: string,
@@ -217,6 +266,11 @@ async function handleTokenRefresh(
   return nextResponse;
 }
 
+/**
+ * Handles sign-in response by creating an encrypted session cookie with user data and tokens.
+ * @param response - The Response from the sign-in endpoint
+ * @returns NextResponse with the session cookie set
+ */
 async function handleSignIn(response: Response): Promise<NextResponse> {
   const data = await response.json();
   const nextResponse = createNextResponse(response, JSON.stringify(data));
@@ -249,6 +303,11 @@ async function handleSignIn(response: Response): Promise<NextResponse> {
   return nextResponse;
 }
 
+/**
+ * Handles sign-out response by deleting the session cookie.
+ * @param response - The Response from the sign-out endpoint
+ * @returns NextResponse with the session cookie deleted
+ */
 async function handleSignOut(response: Response): Promise<NextResponse> {
   const data = await response.text();
   const nextResponse = createNextResponse(response, data);
@@ -256,6 +315,12 @@ async function handleSignOut(response: Response): Promise<NextResponse> {
   return nextResponse;
 }
 
+/**
+ * Main request handler that proxies requests to the backend API with authentication and session management.
+ * @param request - The incoming NextRequest object
+ * @param params - Promise resolving to the path segments from the dynamic route
+ * @returns NextResponse with the proxied backend response
+ */
 async function handleRequest(
   request: NextRequest,
   params: Promise<{ path: string[] }>
@@ -369,3 +434,13 @@ async function handleRequest(
   const data = await response.text();
   return createNextResponse(response, data);
 }
+
+const createHandler: RouteHandler = (request, { params }) =>
+  handleRequest(request, params);
+
+export const GET = createHandler;
+export const POST = createHandler;
+export const PUT = createHandler;
+export const DELETE = createHandler;
+export const PATCH = createHandler;
+export const OPTIONS = createHandler;
