@@ -20,6 +20,7 @@ export const tokens = pgTable(
     previousRefreshTokenExpiresAt: timestamp(
       'previous_refresh_token_expires_at',
     ),
+    expiresAt: timestamp('expires_at').notNull(),
     userAgent: text('user_agent').notNull(),
     ipAddress: text('ip_address').notNull(),
     createdAt: timestamp('created_at').defaultNow(),

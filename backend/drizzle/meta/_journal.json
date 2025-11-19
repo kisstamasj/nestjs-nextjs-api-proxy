@@ -43,6 +43,13 @@
       "when": 1763416716971,
       "tag": "0005_sparkling_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1763541429845,
+      "tag": "0006_white_marauders",
+      "breakpoints": true
     }
   ]
 }
