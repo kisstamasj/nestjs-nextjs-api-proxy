@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "Health App",
 };
 
-export default async function HomePage() {
+export default async function Home() {
   const session = await getUserSession();
   if (!session) {
     redirect("/sign-in");
