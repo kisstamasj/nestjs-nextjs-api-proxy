@@ -69,7 +69,7 @@ export class AuthService {
       ipAddress,
       expiresAt: rememberMe ? new Date(Date.now() + parseInt(
         this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRATION_TIME'),
-      )) : new Date(Date.now() + REFRESH_TOKEN_SHORT_EXPIRATION_TIME),
+      ) * 1000) : new Date(Date.now() + REFRESH_TOKEN_SHORT_EXPIRATION_TIME),
     });
 
     return {
@@ -100,7 +100,7 @@ export class AuthService {
         previousRefreshTokenExpiresAt: new Date(Date.now() + GRACE_PERIOD_MS),
         expiresAt: rememberMe ? new Date(Date.now() + parseInt(
           this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRATION_TIME'),
-        )) : new Date(Date.now() + REFRESH_TOKEN_SHORT_EXPIRATION_TIME),
+        ) * 1000) : new Date(Date.now() + REFRESH_TOKEN_SHORT_EXPIRATION_TIME),
         userAgent,
         ipAddress,
         updatedAt: new Date(),
