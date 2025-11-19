@@ -1,157 +1,25 @@
+
 import {
   BACKEND_API_URL,
-  REFRESH_ENDPOINT,
+  SESSION_EXPIRES_IN,
   SESSION_TOKEN_COOKIE,
   SIGN_IN_ENDPOINT,
   SIGN_OUT_ENDPOINT,
 } from "@/lib/config";
-import { decrypt, encrypt, SessionPayload } from "@/lib/session";
-import { getSessionTokenOption } from "@/lib/token";
-import { cookies } from "next/headers";
+import {
+  createNextResponse,
+  createStreamingResponse,
+  getCookieValue,
+  prepareHeaders,
+  refreshAccessToken
+} from "@/lib/proxy-utils";
+import { decrypt, SessionPayload, setSessionCookie } from "@/lib/session";
 import { NextRequest, NextResponse } from "next/server";
 
 type RouteHandler = (
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> }
 ) => Promise<NextResponse>;
-interface RefreshResponse {
-  access_token: string;
-  refresh_token: string;
-}
-
-/**
- * Retrieves a cookie value by name from the Next.js cookie store.
- * @param name - The name of the cookie to retrieve
- * @returns The cookie value or undefined if not found
- */
-async function getCookieValue(name: string): Promise<string | undefined> {
-  const cookieStore = await cookies();
-  return cookieStore.get(name)?.value;
-}
-
-/**
- * Creates a NextResponse from a fetch Response with text body, removing headers that need recalculation.
- * @param response - The fetch Response object
- * @param body - The response body as a string
- * @returns A NextResponse object with cleaned headers
- */
-function createNextResponse(response: Response, body: string): NextResponse {
-  const headers = new Headers(response.headers);
-
-  // Remove headers that need recalculation
-  headers.delete("content-length");
-  headers.delete("content-encoding");
-  headers.delete("transfer-encoding");
-
-  return new NextResponse(body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: headers,
-  });
-}
-
-/**
- * Creates a streaming NextResponse from a fetch Response, preserving the response body stream.
- * @param response - The fetch Response object with a streaming body
- * @returns A NextResponse object that streams the response body
- */
-function createStreamingResponse(response: Response): NextResponse {
-  const headers = new Headers(response.headers);
-
-  return new NextResponse(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: headers,
-  });
-}
-
-/**
- * Updates the session cookie with new access and refresh tokens.
- * @param response - The NextResponse object to set the cookie on
- * @param sessionPayload - The session data containing user information
- * @param accessToken - The new access token
- * @param refreshToken - The new refresh token
- */
-async function updateSessionCookie(
-  response: NextResponse,
-  sessionPayload: SessionPayload,
-  accessToken: string,
-  refreshToken: string
-): Promise<void> {
-  const encryptedSession = await encrypt({
-    ...sessionPayload,
-    accessToken,
-    refreshToken,
-  });
-  response.cookies.set(getSessionTokenOption(encryptedSession));
-}
-
-/**
- * Refreshes the access token using the refresh token by calling the backend refresh endpoint.
- * @param refreshToken - The refresh token to use for authentication
- * @param userAgent - The user agent string from the original request
- * @param ipAddress - The IP address from the original request
- * @returns The new access and refresh tokens, or null if refresh failed
- */
-async function refreshAccessToken(
-  refreshToken: string,
-  userAgent: string,
-  ipAddress: string
-): Promise<RefreshResponse | null> {
-  try {
-    console.log("Attempting to refresh access token");
-    const response = await fetch(`${BACKEND_API_URL}${REFRESH_ENDPOINT}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${refreshToken}`,
-        "user-agent": userAgent,
-        "x-forwarded-for": ipAddress,
-      },
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const refreshResponseData = await response.json();
-    console.log("Token refresh response:", refreshResponseData);
-
-    return refreshResponseData;
-  } catch (error) {
-    console.error("Token refresh failed:", error);
-    return null;
-  }
-}
-
-/**
- * Prepares request headers for forwarding to the backend, adding authorization and removing sensitive headers.
- * @param request - The incoming NextRequest object
- * @param accessToken - Optional access token to add to the Authorization header
- * @returns Prepared Headers object for the backend request
- */
-function prepareHeaders(request: NextRequest, accessToken?: string): Headers {
-  const headers = new Headers(request.headers);
-
-  if (accessToken) {
-    headers.set("Authorization", `Bearer ${accessToken}`);
-  }
-
-  const userAgent = request.headers.get("user-agent");
-  if (userAgent) {
-    headers.set("user-agent", userAgent);
-  }
-
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    headers.set("x-forwarded-for", forwardedFor);
-  }
-
-  headers.delete("host");
-  headers.delete("cookie");
-
-  return headers;
-}
 
 /**
  * Forwards a request to the backend API with optional body caching for retry scenarios.
@@ -256,11 +124,14 @@ async function handleTokenRefresh(
   const data = await response.text();
   const nextResponse = createNextResponse(response, data);
 
-  await updateSessionCookie(
-    nextResponse,
-    sessionPayload,
-    refreshResult.access_token,
-    refreshResult.refresh_token
+  await setSessionCookie(
+    nextResponse.cookies,
+    {
+      ...sessionPayload,
+      accessToken: refreshResult.access_token,
+      refreshToken: refreshResult.refresh_token,
+    },
+    sessionPayload.rememberMe ? new Date(Date.now() + SESSION_EXPIRES_IN) : undefined
   );
 
   return nextResponse;
@@ -298,18 +169,16 @@ async function handleSignIn(
     updatedAt,
     accessToken,
     refreshToken,
+    rememberMe: rememberMe || false,
   };
 
-  const encryptedSession = await encrypt(sessionPayload);
   console.log("data:", data);
   if (rememberMe) {
     // Persistent cookie (expires in 7 days)
-    nextResponse.cookies.set(
-      getSessionTokenOption(encryptedSession, 7 * 24 * 60 * 60) // 7 days
-    );
+    await setSessionCookie(nextResponse.cookies, sessionPayload, new Date(Date.now() + SESSION_EXPIRES_IN));
   } else {
     // Session cookie (expires when browser closes)
-    nextResponse.cookies.set(getSessionTokenOption(encryptedSession));
+    await setSessionCookie(nextResponse.cookies, sessionPayload);
   }
 
   return nextResponse;
@@ -337,117 +206,125 @@ async function handleRequest(
   request: NextRequest,
   params: Promise<{ path: string[] }>
 ) {
-  const sessionToken = await getCookieValue(SESSION_TOKEN_COOKIE);
-  const sessionPayload = sessionToken ? await decrypt(sessionToken) : undefined;
-  const accessToken = sessionPayload?.accessToken;
-  const refreshToken = sessionPayload?.refreshToken;
+  try {
+    const sessionToken = await getCookieValue(SESSION_TOKEN_COOKIE);
+    const sessionPayload = sessionToken ? await decrypt(sessionToken) : undefined;
+    const accessToken = sessionPayload?.accessToken;
+    const refreshToken = sessionPayload?.refreshToken;
 
-  const resolvedParams = await params;
-  const pathSegments = resolvedParams?.path || [];
-  const fullPath = `/${pathSegments.join("/")}`;
+    const resolvedParams = await params;
+    const pathSegments = resolvedParams?.path || [];
+    const fullPath = `/${pathSegments.join("/")}`;
 
-  const contentType = request.headers.get("content-type") || "";
+    const contentType = request.headers.get("content-type") || "";
 
-  // Check if this is a file upload (multipart/form-data) or large request
-  const isFileUpload = contentType.includes("multipart/form-data");
-  const isLargeRequest = contentType.includes("application/octet-stream");
+    // Check if this is a file upload (multipart/form-data) or large request
+    const isFileUpload = contentType.includes("multipart/form-data");
+    const isLargeRequest = contentType.includes("application/octet-stream");
 
-  // For file uploads or large requests, stream directly without caching
-  if (isFileUpload || isLargeRequest) {
-    const response = await forwardRequestStreaming(
+    // For file uploads or large requests, stream directly without caching
+    if (isFileUpload || isLargeRequest) {
+      const response = await forwardRequestStreaming(
+        request,
+        fullPath,
+        accessToken
+      );
+
+      // Handle token refresh on 401
+      if (response.status === 401 && sessionPayload && refreshToken) {
+        const refreshResult = await refreshAccessToken(
+          refreshToken,
+          request.headers.get("user-agent") || "unknown",
+          request.headers.get("x-forwarded-for") || "unknown"
+        );
+
+        if (!refreshResult) {
+          const errorResponse = NextResponse.json(
+            { error: "Unauthorized - Token refresh failed" },
+            { status: 401 }
+          );
+          errorResponse.cookies.delete(SESSION_TOKEN_COOKIE);
+          return errorResponse;
+        }
+
+        // Note: Cannot retry file upload as body was already consumed
+        // Client should retry the request
+        return NextResponse.json(
+          { error: "Authentication expired during upload. Please retry." },
+          { status: 401 }
+        );
+      }
+
+      // For file downloads, stream the response
+      return createStreamingResponse(response);
+    }
+
+    // Cache request body before first request (body can only be read once)
+    const cachedBody =
+      request.method !== "GET" && request.method !== "HEAD"
+        ? await request.text()
+        : undefined;
+
+    let response = await forwardRequest(
       request,
       fullPath,
-      accessToken
+      accessToken,
+      cachedBody
     );
 
     // Handle token refresh on 401
     if (response.status === 401 && sessionPayload && refreshToken) {
-      const refreshResult = await refreshAccessToken(
+      const refreshedResponse = await handleTokenRefresh(
+        request,
+        fullPath,
+        sessionPayload,
         refreshToken,
-        request.headers.get("user-agent") || "unknown",
-        request.headers.get("x-forwarded-for") || "unknown"
+        cachedBody
       );
-
-      if (!refreshResult) {
-        const errorResponse = NextResponse.json(
-          { error: "Unauthorized - Token refresh failed" },
-          { status: 401 }
-        );
-        errorResponse.cookies.delete(SESSION_TOKEN_COOKIE);
-        return errorResponse;
+      if (refreshedResponse) {
+        response = refreshedResponse;
       }
+    }
 
-      // Note: Cannot retry file upload as body was already consumed
-      // Client should retry the request
-      return NextResponse.json(
-        { error: "Authentication expired during upload. Please retry." },
-        { status: 401 }
+    // Handle sign-in endpoint
+    if (fullPath === SIGN_IN_ENDPOINT && response.ok) {
+      return handleSignIn(
+        response,
+        (cachedBody && JSON.parse(cachedBody).rememberMe) || false
       );
     }
 
-    // For file downloads, stream the response
-    return createStreamingResponse(response);
-  }
-
-  // Cache request body before first request (body can only be read once)
-  const cachedBody =
-    request.method !== "GET" && request.method !== "HEAD"
-      ? await request.text()
-      : undefined;
-
-  let response = await forwardRequest(
-    request,
-    fullPath,
-    accessToken,
-    cachedBody
-  );
-
-  // Handle token refresh on 401
-  if (response.status === 401 && sessionPayload && refreshToken) {
-    const refreshedResponse = await handleTokenRefresh(
-      request,
-      fullPath,
-      sessionPayload,
-      refreshToken,
-      cachedBody
-    );
-    if (refreshedResponse) {
-      response = refreshedResponse;
+    // Handle sign-out endpoint
+    if (fullPath === SIGN_OUT_ENDPOINT && response.ok) {
+      return handleSignOut(response);
     }
-  }
 
-  // Handle sign-in endpoint
-  if (fullPath === SIGN_IN_ENDPOINT && response.ok) {
-    return handleSignIn(
-      response,
-      (cachedBody && JSON.parse(cachedBody).rememberMe) || false
+    // Check if response is binary/streaming content (file download)
+    const responseContentType = response.headers.get("content-type") || "";
+    const isBinaryResponse =
+      responseContentType.includes("application/octet-stream") ||
+      responseContentType.includes("application/pdf") ||
+      responseContentType.includes("image/") ||
+      responseContentType.includes("video/") ||
+      responseContentType.includes("audio/") ||
+      responseContentType.includes("application/zip") ||
+      response.headers.get("content-disposition")?.includes("attachment");
+
+    if (isBinaryResponse) {
+      // Stream binary responses directly
+      return createStreamingResponse(response);
+    }
+
+    // Forward the response as-is for text/JSON
+    const data = await response.text();
+    return createNextResponse(response, data);
+  } catch (error) {
+    console.error("API Proxy Error:", error);
+    return NextResponse.json(
+      { error: "Bad Gateway - Failed to connect to backend" },
+      { status: 502 }
     );
   }
-
-  // Handle sign-out endpoint
-  if (fullPath === SIGN_OUT_ENDPOINT && response.ok) {
-    return handleSignOut(response);
-  }
-
-  // Check if response is binary/streaming content (file download)
-  const responseContentType = response.headers.get("content-type") || "";
-  const isBinaryResponse =
-    responseContentType.includes("application/octet-stream") ||
-    responseContentType.includes("application/pdf") ||
-    responseContentType.includes("image/") ||
-    responseContentType.includes("video/") ||
-    responseContentType.includes("audio/") ||
-    responseContentType.includes("application/zip") ||
-    response.headers.get("content-disposition")?.includes("attachment");
-
-  if (isBinaryResponse) {
-    // Stream binary responses directly
-    return createStreamingResponse(response);
-  }
-
-  // Forward the response as-is for text/JSON
-  const data = await response.text();
-  return createNextResponse(response, data);
 }
 
 const createHandler: RouteHandler = (request, { params }) =>
