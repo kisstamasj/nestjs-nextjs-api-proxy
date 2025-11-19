@@ -15,3 +15,4 @@ export const SIGN_IN_ENDPOINT = "/auth/sign-in";
 export const SIGN_OUT_ENDPOINT = "/auth/sign-out";
 export const REFRESH_ENDPOINT = "/auth/refresh";
 export const SESSION_TOKEN_COOKIE = "session_token";
+export const SESSION_EXPIRES_IN = 7 * 24 * 60 * 60 * 1000; // 7 days
