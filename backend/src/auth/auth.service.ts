@@ -6,7 +6,7 @@ import { and, eq, lt } from 'drizzle-orm';
 import { DrizzleService } from 'src/database/drizzle.service';
 import { User } from 'src/users/users.schema';
 import { UsersService } from 'src/users/users.service';
-import { RequestUser, tokens } from './auth.schema';
+import { RequestUser, sessions } from './auth.schema';
 import { SignUpDto } from './dto/signup.dto';
 
 const GRACE_PERIOD_MS = 20 * 1000; // 20 seconds
@@ -61,7 +61,7 @@ export class AuthService {
       this.signRefreshToken(user, rememberMe),
     ]);
 
-    await this.drizzle.db.insert(tokens).values({
+    await this.drizzle.db.insert(sessions).values({
       userId: user.id,
       accessToken,
       refreshToken,
@@ -92,7 +92,7 @@ export class AuthService {
 
     // Frissítjük a token rekordot az új tokenekkel, és beállítjuk a previousRefreshToken mezőt
     await this.drizzle.db
-      .update(tokens)
+      .update(sessions)
       .set({
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
@@ -107,8 +107,8 @@ export class AuthService {
       })
       .where(
         and(
-          eq(tokens.userId, user.id),
-          eq(tokens.refreshToken, currentRefreshToken),
+          eq(sessions.userId, user.id),
+          eq(sessions.refreshToken, currentRefreshToken),
         ),
       );
 
@@ -128,7 +128,7 @@ export class AuthService {
 
     // Frissítjük csak az access tokent a token rekordban
     await this.drizzle.db
-      .update(tokens)
+      .update(sessions)
       .set({
         accessToken: newAccessToken,
         userAgent,
@@ -136,7 +136,7 @@ export class AuthService {
         updatedAt: new Date(),
       })
       .where(
-        and(eq(tokens.userId, user.id), eq(tokens.refreshToken, refreshToken)),
+        and(eq(sessions.userId, user.id), eq(sessions.refreshToken, refreshToken)),
       );
 
     return newAccessToken;
@@ -154,8 +154,8 @@ export class AuthService {
     // 1. Keressük meg a userhez tartozó token rekordot
     const tokenRecords = await this.drizzle.db
       .select()
-      .from(tokens)
-      .where(eq(tokens.userId, userId));
+      .from(sessions)
+      .where(eq(sessions.userId, userId));
 
     // Mivel a PK-ban van a token, így keresünk a memóriában a rekordok között:
     const record = tokenRecords.find(
@@ -193,16 +193,16 @@ export class AuthService {
   async getTokenByAccessToken(accessToken: string) {
     const [token] = await this.drizzle.db
       .select()
-      .from(tokens)
-      .where(eq(tokens.accessToken, accessToken));
+      .from(sessions)
+      .where(eq(sessions.accessToken, accessToken));
 
     return token;
   }
 
   async signOut(accessToken: string): Promise<void> {
     await this.drizzle.db
-      .delete(tokens)
-      .where(eq(tokens.accessToken, accessToken));
+      .delete(sessions)
+      .where(eq(sessions.accessToken, accessToken));
   }
 
   async signAccessToken(user: RequestUser): Promise<string> {
@@ -228,11 +228,11 @@ export class AuthService {
 
   async removeExpiredTokens(userId: string) {
     await this.drizzle.db
-      .delete(tokens)
+      .delete(sessions)
       .where(
         and(
-          eq(tokens.userId, userId),
-          lt(tokens.expiresAt, new Date()),
+          eq(sessions.userId, userId),
+          lt(sessions.expiresAt, new Date()),
         ),
       );
   }

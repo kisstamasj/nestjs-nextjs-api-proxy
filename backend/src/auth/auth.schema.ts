@@ -8,8 +8,8 @@ import {
 import { User, users } from 'src/users/users.schema';
 import z from 'zod';
 
-export const tokens = pgTable(
-  'tokens',
+export const sessions = pgTable(
+  'sessions',
   {
     userId: uuid('user_id')
       .notNull()
@@ -28,13 +28,13 @@ export const tokens = pgTable(
   },
   (table) => [
     primaryKey({
-      name: 'tokens_pk',
+      name: 'sessions_pk',
       columns: [table.userId, table.refreshToken],
     }),
   ],
 );
 
-export type Token = typeof tokens.$inferSelect;
+export type Token = typeof sessions.$inferSelect;
 
 export type RequestUser = User & {
   refreshToken?: string;
