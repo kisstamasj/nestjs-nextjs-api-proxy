@@ -1,13 +1,16 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import * as argon2 from 'argon2';
-import { UsersService } from 'src/users/users.service';
-import { SignUpDto } from './dto/signup.dto';
-import { User } from 'src/users/users.schema';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import * as argon2 from 'argon2';
+import { and, eq, lt } from 'drizzle-orm';
 import { DrizzleService } from 'src/database/drizzle.service';
+import { User } from 'src/users/users.schema';
+import { UsersService } from 'src/users/users.service';
 import { RequestUser, tokens } from './auth.schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { SignUpDto } from './dto/signup.dto';
+
+const GRACE_PERIOD_MS = 20 * 1000; // 20 seconds
+const REFRESH_TOKEN_SHORT_EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
 
 @Injectable()
 export class AuthService {
@@ -64,6 +67,9 @@ export class AuthService {
       refreshToken,
       userAgent,
       ipAddress,
+      expiresAt: rememberMe ? new Date(Date.now() + parseInt(
+        this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRATION_TIME'),
+      )) : new Date(Date.now() + REFRESH_TOKEN_SHORT_EXPIRATION_TIME),
     });
 
     return {
@@ -79,8 +85,6 @@ export class AuthService {
     ipAddress: string,
     rememberMe: boolean,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    const GRACE_PERIOD_MS = 20 * 1000; // 20 másodperc
-
     const [newAccessToken, newRefreshToken] = await Promise.all([
       this.signAccessToken(user),
       this.signRefreshToken(user, rememberMe),
@@ -94,6 +98,9 @@ export class AuthService {
         refreshToken: newRefreshToken,
         previousRefreshToken: currentRefreshToken,
         previousRefreshTokenExpiresAt: new Date(Date.now() + GRACE_PERIOD_MS),
+        expiresAt: rememberMe ? new Date(Date.now() + parseInt(
+          this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRATION_TIME'),
+        )) : new Date(Date.now() + REFRESH_TOKEN_SHORT_EXPIRATION_TIME),
         userAgent,
         ipAddress,
         updatedAt: new Date(),
@@ -217,5 +224,16 @@ export class AuthService {
         this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRATION_TIME'),
       ) : '1d',
     });
+  }
+
+  async removeExpiredTokens(userId: string) {
+    await this.drizzle.db
+      .delete(tokens)
+      .where(
+        and(
+          eq(tokens.userId, userId),
+          lt(tokens.expiresAt, new Date()),
+        ),
+      );
   }
 }

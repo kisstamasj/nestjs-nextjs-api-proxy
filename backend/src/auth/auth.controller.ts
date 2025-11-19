@@ -54,6 +54,8 @@ export class AuthController {
       body.rememberMe,
     );
 
+    await this.authService.removeExpiredTokens(user.id);
+
     const loggedInUser: LoggedInUser = { ...user, accessToken, refreshToken };
 
     return loggedInUser;
@@ -91,6 +93,8 @@ export class AuthController {
       ipAddress,
       body.rememberMe,
     );
+
+    await this.authService.removeExpiredTokens(user.id);
 
     return {
       access_token: accessToken,
