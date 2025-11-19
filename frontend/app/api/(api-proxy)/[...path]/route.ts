@@ -21,19 +21,53 @@ type RouteHandler = (
   context: { params: Promise<{ path: string[] }> }
 ) => Promise<NextResponse>;
 
+interface ErrorResponse {
+  error: string;
+  message: string;
+  code: string;
+  statusCode: number;
+}
+
+/**
+ * Creates a standardized error response.
+ * @param code - The error code (e.g., 'BACKEND_TIMEOUT')
+ * @param message - The human-readable error message
+ * @param statusCode - The HTTP status code
+ * @returns NextResponse with the error details
+ */
+function createErrorResponse(
+  code: string,
+  message: string,
+  statusCode: number
+): NextResponse<ErrorResponse> {
+  const response: ErrorResponse = {
+    error: code,
+    message,
+    code,
+    statusCode,
+  };
+
+  // Log error in production/development
+  console.error(`[API Proxy Error] ${code}: ${message}`);
+
+  return NextResponse.json(response, { status: statusCode });
+}
+
 /**
  * Forwards a request to the backend API with optional body caching for retry scenarios.
  * @param request - The incoming NextRequest object
  * @param path - The API path to forward to
  * @param accessToken - Optional access token for authentication
  * @param cachedBody - Optional cached request body for retries
+ * @param signal - Optional AbortSignal for timeouts
  * @returns The Response from the backend API
  */
 async function forwardRequest(
   request: NextRequest,
   path: string,
   accessToken?: string,
-  cachedBody?: string
+  cachedBody?: string,
+  signal?: AbortSignal
 ): Promise<Response> {
   const url = new URL(request.url);
   const backendUrl = `${BACKEND_API_URL}${path}${url.search}`;
@@ -43,6 +77,7 @@ async function forwardRequest(
   const options: RequestInit = {
     method: request.method,
     headers,
+    signal,
   };
 
   if (cachedBody !== undefined) {
@@ -52,6 +87,77 @@ async function forwardRequest(
   console.log("Forwarding request to backend:", backendUrl);
 
   return fetch(backendUrl, options);
+}
+
+/**
+ * Forwards a request to the backend API with retry logic for 5xx errors and timeouts.
+ * @param request - The incoming NextRequest object
+ * @param path - The API path to forward to
+ * @param accessToken - Optional access token for authentication
+ * @param cachedBody - Optional cached request body for retries
+ * @param retries - Number of retries for 5xx errors (default: 2)
+ * @param timeoutMs - Timeout in milliseconds (default: 30000)
+ * @returns The Response from the backend API
+ */
+async function forwardRequestWithRetry(
+  request: NextRequest,
+  path: string,
+  accessToken?: string,
+  cachedBody?: string,
+  retries: number = 2,
+  timeoutMs: number = 30000
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await forwardRequest(
+        request,
+        path,
+        accessToken,
+        cachedBody,
+        controller.signal
+      );
+
+      clearTimeout(timeoutId);
+
+      // Don't retry client errors (4xx) or successful responses
+      if (response.status < 500) {
+        return response;
+      }
+
+      // Retry server errors (5xx)
+      if (attempt < retries) {
+        console.log(`Backend error ${response.status}, retrying (${attempt + 1}/${retries})`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // Exponential backoff
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      lastError = error as Error;
+
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Don't retry on timeout if we want to fail fast, or maybe we do? 
+        // Usually timeouts are worth retrying if it's a transient network blip, 
+        // but 30s is long. Let's treat timeout as a retryable error if we have retries left.
+        console.log(`Request timeout, retrying (${attempt + 1}/${retries})`);
+      } else {
+        console.log(`Request failed, retrying (${attempt + 1}/${retries})`);
+      }
+
+      if (attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        continue;
+      }
+    }
+  }
+
+  throw lastError || new Error('Request failed after retries');
 }
 
 /**
@@ -108,34 +214,45 @@ async function handleTokenRefresh(
   );
 
   if (!refreshResult) {
-    const errorResponse = NextResponse.json(
-      { error: "Unauthorized - Token refresh failed" },
-      { status: 401 }
+    const errorResponse = createErrorResponse(
+      "TOKEN_REFRESH_FAILED",
+      "Session expired. Please sign in again.",
+      401
     );
     errorResponse.cookies.delete(SESSION_TOKEN_COOKIE);
     return errorResponse;
   }
 
-  const response = await forwardRequest(
-    request,
-    fullPath,
-    refreshResult.access_token,
-    cachedBody
-  );
-  const data = await response.text();
-  const nextResponse = createNextResponse(response, data);
+  // Retry with new token, using the retry logic
+  try {
+    const response = await forwardRequestWithRetry(
+      request,
+      fullPath,
+      refreshResult.access_token,
+      cachedBody
+    );
+    const data = await response.text();
+    const nextResponse = createNextResponse(response, data);
 
-  await setSessionCookie(
-    nextResponse.cookies,
-    {
-      ...sessionPayload,
-      accessToken: refreshResult.access_token,
-      refreshToken: refreshResult.refresh_token,
-    },
-    sessionPayload.rememberMe ? new Date(Date.now() + SESSION_EXPIRES_IN) : undefined
-  );
+    await setSessionCookie(
+      nextResponse.cookies,
+      {
+        ...sessionPayload,
+        accessToken: refreshResult.access_token,
+        refreshToken: refreshResult.refresh_token,
+      },
+      sessionPayload.rememberMe ? new Date(Date.now() + SESSION_EXPIRES_IN) : undefined
+    );
 
-  return nextResponse;
+    return nextResponse;
+  } catch (error) {
+    console.error("Failed to retry request after refresh:", error);
+    return createErrorResponse(
+      "RETRY_FAILED",
+      "Failed to complete request after token refresh",
+      502
+    );
+  }
 }
 
 /**
@@ -147,7 +264,28 @@ async function handleSignIn(
   response: Response,
   rememberMe?: boolean
 ): Promise<NextResponse> {
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch (error) {
+    console.error("Invalid JSON response from sign-in endpoint", error);
+    return createErrorResponse(
+      "INVALID_AUTH_RESPONSE",
+      "Invalid response from authentication server",
+      502
+    );
+  }
+
+  // Validate required fields
+  if (!data.accessToken || !data.refreshToken || !data.id || !data.email) {
+    console.error("Missing required fields in sign-in response", data);
+    return createErrorResponse(
+      "INVALID_AUTH_DATA",
+      "Authentication response missing required fields",
+      502
+    );
+  }
+
   const nextResponse = createNextResponse(response, JSON.stringify(data));
 
   const {
@@ -193,6 +331,8 @@ async function handleSignIn(
 async function handleSignOut(response: Response): Promise<NextResponse> {
   const data = await response.text();
   const nextResponse = createNextResponse(response, data);
+
+  // Always delete the cookie, even if backend sign-out had issues (best effort)
   nextResponse.cookies.delete(SESSION_TOKEN_COOKIE);
   return nextResponse;
 }
@@ -241,9 +381,10 @@ async function handleRequest(
         );
 
         if (!refreshResult) {
-          const errorResponse = NextResponse.json(
-            { error: "Unauthorized - Token refresh failed" },
-            { status: 401 }
+          const errorResponse = createErrorResponse(
+            "TOKEN_REFRESH_FAILED",
+            "Session expired. Please sign in again.",
+            401
           );
           errorResponse.cookies.delete(SESSION_TOKEN_COOKIE);
           return errorResponse;
@@ -251,9 +392,10 @@ async function handleRequest(
 
         // Note: Cannot retry file upload as body was already consumed
         // Client should retry the request
-        return NextResponse.json(
-          { error: "Authentication expired during upload. Please retry." },
-          { status: 401 }
+        return createErrorResponse(
+          "UPLOAD_AUTH_EXPIRED",
+          "Authentication expired during upload. Please retry.",
+          401
         );
       }
 
@@ -267,7 +409,7 @@ async function handleRequest(
         ? await request.text()
         : undefined;
 
-    let response = await forwardRequest(
+    let response = await forwardRequestWithRetry(
       request,
       fullPath,
       accessToken,
@@ -322,9 +464,19 @@ async function handleRequest(
     return createNextResponse(response, data);
   } catch (error) {
     console.error("API Proxy Error:", error);
-    return NextResponse.json(
-      { error: "Bad Gateway - Failed to connect to backend" },
-      { status: 502 }
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      return createErrorResponse(
+        "GATEWAY_TIMEOUT",
+        "The backend server timed out",
+        504
+      );
+    }
+
+    return createErrorResponse(
+      "BAD_GATEWAY",
+      "Failed to connect to backend",
+      502
     );
   }
 }
