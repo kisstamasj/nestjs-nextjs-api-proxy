@@ -32,7 +32,7 @@ type LoggedInUser = User & { accessToken: string; refreshToken: string };
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('sign-up')
   async signUp(@Body() signUpDto: SignUpDto) {
@@ -42,7 +42,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard('local'))
   @Post('sign-in')
-  async login(@Req() req: RequestWithUser) {
+  async login(@Req() req: RequestWithUser, @Body() body: { rememberMe: boolean }) {
     const user = req.user;
     const userAgent = req.headers['user-agent'] || 'unknown';
     const ipAddress = req.ip;
@@ -51,6 +51,7 @@ export class AuthController {
       user,
       userAgent,
       ipAddress,
+      body.rememberMe,
     );
 
     const loggedInUser: LoggedInUser = { ...user, accessToken, refreshToken };
@@ -63,6 +64,7 @@ export class AuthController {
   async refreshTokens(
     @Req() req: RefreshTokenPayload,
     @Res({ passthrough: true }) res: Response,
+    @Body() body: { rememberMe: boolean }
   ) {
     const user = req.user.user;
     const userAgent = req.headers['user-agent'] || 'unknown';
@@ -87,6 +89,7 @@ export class AuthController {
       record.refreshToken,
       userAgent,
       ipAddress,
+      body.rememberMe,
     );
 
     return {

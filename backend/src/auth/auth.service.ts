@@ -16,7 +16,7 @@ export class AuthService {
     private readonly userService: UsersService,
     private readonly jwtService: JwtService,
     private readonly drizzle: DrizzleService,
-  ) {}
+  ) { }
 
   async signup(signUpDto: SignUpDto): Promise<any> {
     const user = await this.userService.createUser({
@@ -51,10 +51,11 @@ export class AuthService {
     user: RequestUser,
     userAgent: string,
     ipAddress: string,
+    rememberMe: boolean,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const [accessToken, refreshToken] = await Promise.all([
       this.signAccessToken(user),
-      this.signRefreshToken(user),
+      this.signRefreshToken(user, rememberMe),
     ]);
 
     await this.drizzle.db.insert(tokens).values({
@@ -76,12 +77,13 @@ export class AuthService {
     currentRefreshToken: string,
     userAgent: string,
     ipAddress: string,
+    rememberMe: boolean,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const GRACE_PERIOD_MS = 20 * 1000; // 20 másodperc
 
     const [newAccessToken, newRefreshToken] = await Promise.all([
       this.signAccessToken(user),
-      this.signRefreshToken(user),
+      this.signRefreshToken(user, rememberMe),
     ]);
 
     // Frissítjük a token rekordot az új tokenekkel, és beállítjuk a previousRefreshToken mezőt
@@ -206,13 +208,14 @@ export class AuthService {
     });
   }
 
-  async signRefreshToken(user: RequestUser): Promise<string> {
+  async signRefreshToken(user: RequestUser, rememberMe: boolean): Promise<string> {
     const payload = { email: user.email, sub: user.id };
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_TOKEN_SECRET'),
-      expiresIn: parseInt(
+      // If rememberMe is true, use the refresh token expiration time from the config, otherwise use 1 day
+      expiresIn: rememberMe ? parseInt(
         this.configService.get<string>('JWT_REFRESH_TOKEN_EXPIRATION_TIME'),
-      ),
+      ) : '1d',
     });
   }
 }
