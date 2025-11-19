@@ -67,7 +67,8 @@ export function createStreamingResponse(response: Response): NextResponse {
 export async function refreshAccessToken(
   refreshToken: string,
   userAgent: string,
-  ipAddress: string
+  ipAddress: string,
+  rememberMe: boolean
 ): Promise<RefreshResponse | null> {
   try {
     console.log("Attempting to refresh access token");
@@ -79,6 +80,7 @@ export async function refreshAccessToken(
         "user-agent": userAgent,
         "x-forwarded-for": ipAddress,
       },
+      body: JSON.stringify({ rememberMe }),
     });
 
     if (!response.ok) {

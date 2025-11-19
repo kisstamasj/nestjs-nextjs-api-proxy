@@ -103,7 +103,8 @@ async function handleTokenRefresh(
   const refreshResult = await refreshAccessToken(
     refreshToken,
     request.headers.get("user-agent") || "unknown",
-    request.headers.get("x-forwarded-for") || "unknown"
+    request.headers.get("x-forwarded-for") || "unknown",
+    sessionPayload.rememberMe
   );
 
   if (!refreshResult) {
@@ -235,7 +236,8 @@ async function handleRequest(
         const refreshResult = await refreshAccessToken(
           refreshToken,
           request.headers.get("user-agent") || "unknown",
-          request.headers.get("x-forwarded-for") || "unknown"
+          request.headers.get("x-forwarded-for") || "unknown",
+          sessionPayload.rememberMe
         );
 
         if (!refreshResult) {
