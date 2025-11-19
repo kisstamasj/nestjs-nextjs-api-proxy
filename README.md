@@ -47,6 +47,7 @@ A modern full-stack health application with a NestJS backend API and Next.js fro
   - JWT Access & Refresh token implementation with automatic rotation
   - Multiple Passport strategies (Local, JWT Access, JWT Refresh)
   - Session tracking with token persistence in database
+  - "Remember Me" functionality for extended session duration
   - Protected routes with role-based guards
 - **Database Integration**: PostgreSQL with Drizzle ORM and type-safe queries
 - **Security Implementation**:
@@ -64,6 +65,7 @@ A modern full-stack health application with a NestJS backend API and Next.js fro
 - **Authentication System**:
   - Session-based authentication with encrypted cookies
   - Sign up and sign in forms with comprehensive validation
+  - "Remember Me" option for persistent sessions
   - Automatic token refresh and session management
   - Protected routes with session verification
 - **User Interface Components**:
