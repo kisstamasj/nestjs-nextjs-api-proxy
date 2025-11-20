@@ -198,7 +198,7 @@ flowchart TD
     J --> K[Create SessionPayload]
     K --> L{rememberMe?}
     L -->|Yes| M[Expires in 7 days]
-    L -->|No| N[Expires in 1 hour]
+    L -->|No| N[Expires in 1 day]
     M --> O[Encrypt & Set Cookie]
     N --> O
     O --> P[Return response to browser]
@@ -483,7 +483,7 @@ export async function decrypt(session: string | undefined = "") {
 **Security**:
 - **Algorithm**: HS256 (HMAC with SHA-256)
 - **Secret**: `SESSION_SECRET` environment variable
-- **Expiration**: Dynamic (7 days for rememberMe, 1 hour otherwise)
+- **Expiration**: Dynamic (7 days for rememberMe, 1 day otherwise)
 - **Storage**: HTTP-only cookie (inaccessible to JavaScript)
 
 ---
