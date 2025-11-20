@@ -25,7 +25,7 @@ This project implements a secure authentication flow where **JWT tokens are neve
 ## 🏗️ Tech Stack
 
 - **Frontend**: Next.js 16 (App Router), Tailwind CSS, Radix UI
-- **Backend**: NestJS 11, Fastify (optional but compatible), Passport.js
+- **Backend**: NestJS 11, Express, Passport.js
 - **Database**: PostgreSQL, Drizzle ORM
 - **Auth**: JWT (Access + Refresh), Argon2 hashing
 
