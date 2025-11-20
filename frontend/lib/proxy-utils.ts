@@ -2,7 +2,6 @@ import {
   BACKEND_API_URL,
   REFRESH_ENDPOINT,
 } from "@/lib/config";
-import { encrypt, getSessionTokenOption, SessionPayload, setSessionCookie } from "@/lib/session";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 

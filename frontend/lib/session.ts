@@ -3,7 +3,7 @@
 import { JWTPayload, jwtVerify, SignJWT } from "jose";
 import { ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
 import { cookies } from "next/headers";
-import { SESSION_EXPIRES_IN, SESSION_SECRET, SESSION_TOKEN_COOKIE } from "./config";
+import { SESSION_EXPIRES_IN, SESSION_SECRET, SESSION_SHORT_EXPIRATION_TIME, SESSION_TOKEN_COOKIE } from "./config";
 
 
 const encodedKey = new TextEncoder().encode(SESSION_SECRET);
@@ -27,7 +27,7 @@ export async function encrypt(payload: SessionPayload) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(payload.rememberMe ? new Date(Date.now() + SESSION_EXPIRES_IN) : new Date(Date.now() + 60 * 60 * 1000))
+    .setExpirationTime(payload.rememberMe ? new Date(Date.now() + SESSION_EXPIRES_IN) : new Date(Date.now() + SESSION_SHORT_EXPIRATION_TIME))
     .sign(encodedKey);
 }
 
