@@ -83,7 +83,7 @@ docker-compose up -d
 cd backend
 pnpm install
 # Create .env (see .env.example or below)
-pnpm drizzle:push # Setup DB schema
+pnpm drizzle:migrate # Setup DB schema
 pnpm start:dev
 ```
 
