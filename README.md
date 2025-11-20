@@ -107,7 +107,7 @@ JWT_REFRESH_TOKEN_EXPIRATION_TIME=604800
 FRONTEND_URL=http://localhost:3000
 ```
 
-**Frontend (`frontend/.env.local`)**
+**Frontend (`frontend/.env`)**
 ```env
 BACKEND_API_URL=http://localhost:5000
 SESSION_SECRET=min-32-chars-secret
