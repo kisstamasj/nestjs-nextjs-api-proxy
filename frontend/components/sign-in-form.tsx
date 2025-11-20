@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Checkbox } from "./ui/checkbox";
 import { Label } from "./ui/label";
+import { SIGN_IN_ENDPOINT } from "@/lib/config";
 
 const signInFormSchema = z.object({
   email: z.string().email(),
@@ -31,7 +32,7 @@ export default function SignInForm({
       onSubmit: signInFormSchema,
     },
     onSubmit: async ({ value }) => {
-      const response = await fetch("/api/auth/sign-in", {
+      const response = await fetch(`/api${SIGN_IN_ENDPOINT}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

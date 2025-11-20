@@ -591,23 +591,31 @@ BACKEND_API_URL=http://localhost:3001
 
 # Session encryption secret (use strong random string)
 SESSION_SECRET=your-super-secret-key-min-32-chars
+
+# Next.js app URL (without trailing slash)
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 ### Config File (`lib/config.ts`)
 
 ```typescript
+export const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
 export const BACKEND_API_URL = process.env.BACKEND_API_URL;
-export const SIGN_IN_ENDPOINT = "/auth/sign-in"; 
-export const SIGN_OUT_ENDPOINT = "/auth/sign-out"; 
-export const REFRESH_ENDPOINT = "/auth/refresh"; 
 export const SESSION_SECRET = process.env.SESSION_SECRET;
+export const SIGN_IN_ENDPOINT = "/auth/sign-in";
+export const SIGN_OUT_ENDPOINT = "/auth/sign-out";
+export const REFRESH_ENDPOINT = "/auth/refresh";
 export const SESSION_TOKEN_COOKIE = "session_token";
+export const SESSION_EXPIRES_IN = 7 * 24 * 60 * 60 * 1000; // 7 days
+export const SESSION_SHORT_EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
 ```
 
 **Modifiable Values**:
 - **Endpoint paths**: Change if your backend uses different routes
 - **Cookie name**: Change `SESSION_TOKEN_COOKIE` if needed
 - **Token expiration**: Currently 7 days (hardcoded in `encrypt()` and cookie options)
+- **Short token expiration**: Currently 24 hours (hardcoded in `encrypt()` and cookie options)
+- **App URL**: Change `APP_URL` if needed
 
 ---
 

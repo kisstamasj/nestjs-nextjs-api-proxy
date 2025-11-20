@@ -1,5 +1,6 @@
 "use client";
 
+import { SIGN_OUT_ENDPOINT } from "@/lib/config";
 import { User } from "@/lib/session";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -10,7 +11,7 @@ const Profile = ({ session }: { session: User | null }) => {
   const [profileFetchedCount, setProfileFetchedCount] = useState(0);
 
   const signOut = async () => {
-    await fetch("/api/auth/sign-out", {
+    await fetch(`/api${SIGN_OUT_ENDPOINT}`, {
       method: "POST",
     });
     router.refresh();
