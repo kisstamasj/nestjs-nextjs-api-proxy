@@ -37,9 +37,9 @@ graph LR
     B -->|Response +<br/>Set-Cookie| A
     A -.->|session_token<br/>HTTP-only cookie| B
     
-    style A fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style B fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    style C fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style A fill:#1565c0,stroke:#0d47a1,stroke-width:2px,color:#fff
+    style B fill:#e65100,stroke:#bf360c,stroke-width:2px,color:#fff
+    style C fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#fff
 ```
 
 **Flow Overview:**
@@ -69,9 +69,9 @@ flowchart LR
     Auth <--> DB
     Session -.->|Encrypted Cookie| Browser
     
-    style Client fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style Proxy fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    style Backend fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style Client fill:#1565c0,stroke:#0d47a1,stroke-width:2px,color:#fff
+    style Proxy fill:#e65100,stroke:#bf360c,stroke-width:2px,color:#fff
+    style Backend fill:#2e7d32,stroke:#1b5e20,stroke-width:2px,color:#fff
 ```
 
 ### Why Use a Proxy?
@@ -175,11 +175,11 @@ flowchart TD
     N --> R
     Q --> R
     
-    style A fill:#e1f5ff
-    style I fill:#fff4e1
-    style R fill:#e8f5e9
-    style M fill:#fff3e0
-    style Q fill:#ffebee
+    style A fill:#1565c0,stroke:#0d47a1,color:#fff
+    style I fill:#e65100,stroke:#bf360c,color:#fff
+    style R fill:#2e7d32,stroke:#1b5e20,color:#fff
+    style M fill:#f9a825,stroke:#f57f17,color:#fff
+    style Q fill:#c62828,stroke:#b71c1c,color:#fff
 ```
 
 ### Authentication Request Flow (Sign In)
@@ -205,11 +205,11 @@ flowchart TD
     G --> Q[Browser receives 401]
     P --> R[Browser receives 200<br/>+ session cookie]
     
-    style A fill:#e1f5ff
-    style E fill:#fff4e1
-    style O fill:#e8f5e9
-    style R fill:#e8f5e9
-    style Q fill:#ffebee
+    style A fill:#1565c0,stroke:#0d47a1,color:#fff
+    style E fill:#e65100,stroke:#bf360c,color:#fff
+    style O fill:#2e7d32,stroke:#1b5e20,color:#fff
+    style R fill:#2e7d32,stroke:#1b5e20,color:#fff
+    style Q fill:#c62828,stroke:#b71c1c,color:#fff
 ```
 
 ### Token Refresh Flow
@@ -238,13 +238,13 @@ flowchart TD
     S --> T[Return 200 + data<br/>to browser]
     N --> U[Clear session cookie<br/>Return 401]
     
-    style A fill:#e1f5ff
-    style G fill:#fff3e0
-    style J fill:#fff9c4
-    style Q fill:#e0f2f1
-    style S fill:#f3e5f5
-    style T fill:#e8f5e9
-    style U fill:#ffebee
+    style A fill:#1565c0,stroke:#0d47a1,color:#fff
+    style G fill:#e65100,stroke:#bf360c,color:#fff
+    style J fill:#f9a825,stroke:#f57f17,color:#fff
+    style Q fill:#00695c,stroke:#004d40,color:#fff
+    style S fill:#6a1b9a,stroke:#4a148c,color:#fff
+    style T fill:#2e7d32,stroke:#1b5e20,color:#fff
+    style U fill:#c62828,stroke:#b71c1c,color:#fff
 ```
 
 ---
