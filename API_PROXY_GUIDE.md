@@ -91,8 +91,8 @@ frontend/
 ├── app/api/[...path]/route.ts    # Main proxy route handler
 ├── lib/
 │   ├── config.ts                  # Environment & endpoint configuration
-│   ├── session.ts                 # Session encryption/decryption (JWT)
-│   └── token.ts                   # Cookie options helper
+│   ├── session.ts                 # Session encryption/decryption (JWT) & cookie helpers
+│   └── proxy-utils.ts             # Shared proxy utilities (headers, refresh, retry)
 ```
 
 ---
@@ -134,12 +134,14 @@ interface SessionPayload {
   lastName: string;
   accessToken: string;
   refreshToken: string;
+  rememberMe: boolean;
 }
 ```
 
 This structure holds:
 - User information (id, email, name)
 - Authentication tokens (access & refresh)
+- Session persistence preference (`rememberMe`)
 
 Stored **encrypted** as a JWT in an HTTP-only cookie.
 
@@ -156,8 +158,8 @@ flowchart TD
     C -->|Yes| D[Decrypt session cookie]
     C -->|No| E[No accessToken]
     D --> F[Extract accessToken]
-    F --> G[forwardRequest with<br/>Authorization: Bearer token]
-    E --> H[forwardRequest without<br/>Authorization header]
+    F --> G[forwardRequestWithRetry]
+    E --> H["forwardRequestWithRetry<br/>(no auth)"]
     G --> I[Backend API]
     H --> I
     I --> J{Response<br/>status?}
@@ -184,28 +186,30 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Browser: POST /api/auth/sign-in] --> B[Request body:<br/>email, password]
+    A[Browser: POST /api/auth/sign-in] --> B[Request body:<br/>email, password, rememberMe]
     B --> C[Next.js Proxy Handler]
     C --> D[forwardRequest to backend<br/>/auth/sign-in]
     D --> E[Backend: NestJS Auth Service]
     E --> F{Credentials<br/>valid?}
     F -->|No| G[Return 401 Unauthorized]
     F -->|Yes| H[Generate accessToken<br/>Generate refreshToken]
-    H --> I[Return user data + tokens:<br/>accessToken, refreshToken,<br/>id, email, firstName, lastName]
+    H --> I[Return user data + tokens]
     I --> J[Proxy: handleSignIn]
-    J --> K[Create SessionPayload:<br/>id, email, firstName,<br/>lastName, accessToken,<br/>refreshToken]
-    K --> L[Encrypt session<br/>Using HS256 JWT<br/>Expires in 7 days]
-    L --> M[Set HTTP-only cookie:<br/>session_token=encrypted_jwt]
-    M --> N[Return response to browser]
-    G --> O[Browser receives 401]
-    N --> P[Browser receives 200<br/>+ session cookie]
+    J --> K[Create SessionPayload]
+    K --> L{rememberMe?}
+    L -->|Yes| M[Expires in 7 days]
+    L -->|No| N[Expires in 1 hour]
+    M --> O[Encrypt & Set Cookie]
+    N --> O
+    O --> P[Return response to browser]
+    G --> Q[Browser receives 401]
+    P --> R[Browser receives 200<br/>+ session cookie]
     
     style A fill:#e1f5ff
     style E fill:#fff4e1
-    style L fill:#f3e5f5
-    style M fill:#e8f5e9
-    style P fill:#e8f5e9
-    style O fill:#ffebee
+    style O fill:#e8f5e9
+    style R fill:#e8f5e9
+    style Q fill:#ffebee
 ```
 
 ### Token Refresh Flow
@@ -215,27 +219,24 @@ flowchart TD
     A[Browser: GET /api/users] --> B[Proxy: handleRequest]
     B --> C[Decrypt session cookie]
     C --> D[Extract accessToken<br/>expired]
-    D --> E[forwardRequest with<br/>expired accessToken]
+    D --> E[forwardRequestWithRetry]
     E --> F[Backend API]
     F --> G[401 Unauthorized<br/>Token expired]
     G --> H{Proxy checks:<br/>Has refreshToken?}
     H -->|No| I[Clear session cookie<br/>Return 401]
     H -->|Yes| J[handleTokenRefresh]
-    J --> K[POST /auth/refresh<br/>Authorization: Bearer refreshToken]
+    J --> K[POST /auth/refresh]
     K --> L[Backend: Validate refresh token]
     L --> M{Refresh token<br/>valid?}
     M -->|No| N[401: Refresh failed]
     M -->|Yes| O[Generate new tokens]
-    O --> P[Return:<br/>access_token,<br/>refresh_token]
-    P --> Q[Proxy: Retry original request<br/>GET /users with new accessToken]
+    O --> P[Return new tokens]
+    P --> Q[Proxy: Retry original request<br/>with new accessToken]
     Q --> F
     F --> R[200 OK: User data]
     R --> S[Update session cookie<br/>with new tokens]
     S --> T[Return 200 + data<br/>to browser]
     N --> U[Clear session cookie<br/>Return 401]
-    I --> V[Browser: User logged out]
-    U --> V
-    T --> W[Browser: Request successful<br/>Session refreshed transparently]
     
     style A fill:#e1f5ff
     style G fill:#fff3e0
@@ -243,8 +244,7 @@ flowchart TD
     style Q fill:#e0f2f1
     style S fill:#f3e5f5
     style T fill:#e8f5e9
-    style V fill:#ffebee
-    style W fill:#e8f5e9
+    style U fill:#ffebee
 ```
 
 ---
@@ -279,134 +279,105 @@ async function handleRequest(
   const resolvedParams = await params;
   const fullPath = `/${resolvedParams.path.join("/")}`;
   
-  // 3. Cache request body (can only be read once)
+  // 3. Check for file upload / large request
+  const isFileUpload = contentType.includes("multipart/form-data");
+  if (isFileUpload) {
+    return forwardRequestStreaming(request, fullPath, accessToken);
+  }
+  
+  // 4. Cache request body (can only be read once)
   const cachedBody = request.method !== "GET" && request.method !== "HEAD" 
     ? await request.text() 
     : undefined;
   
-  // 4. Forward to backend
-  let response = await forwardRequest(request, fullPath, accessToken, cachedBody);
+  // 5. Forward to backend with retry logic
+  let response = await forwardRequestWithRetry(request, fullPath, accessToken, cachedBody);
   
-  // 5. Handle 401 with token refresh
+  // 6. Handle 401 with token refresh
   if (response.status === 401 && sessionPayload && refreshToken) {
     response = await handleTokenRefresh(...);
   }
   
-  // 6. Handle special endpoints
+  // 7. Handle special endpoints (Sign-in/Sign-out)
   if (fullPath === SIGN_IN_ENDPOINT && response.ok) {
-    return handleSignIn(response);
+    return handleSignIn(response, rememberMe);
   }
   
-  // 7. Forward response
+  // 8. Forward response
   return createNextResponse(response, await response.text());
 }
 ```
 
 **Key Details**:
-- **Body Caching**: Request bodies can only be read once. We cache it for potential retry after token refresh.
-- **Async Params**: Next.js 15+ requires `await params` for dynamic routes.
-- **Special Endpoint Handling**: Sign-in/sign-out get special cookie management.
+- **Streaming Support**: Handles file uploads and large requests via `forwardRequestStreaming`.
+- **Retry Logic**: Uses `forwardRequestWithRetry` for robustness.
+- **Body Caching**: Caches non-GET bodies for potential retries.
+- **Async Params**: Compatible with Next.js 15+ async params.
 
 ---
 
-### 2. `forwardRequest()` - Backend Proxy
+### 2. `forwardRequestWithRetry()` - Robust Proxying
 
-**Purpose**: Forwards the request to the backend API
+**Purpose**: Forwards requests with automatic retries for network/server errors
 
 ```typescript
-async function forwardRequest(
+async function forwardRequestWithRetry(
   request: NextRequest,
   path: string,
   accessToken?: string,
-  cachedBody?: string
+  cachedBody?: string,
+  retries: number = 2,
+  timeoutMs: number = 30000
 ): Promise<Response> {
-  const url = new URL(request.url);
-  const backendUrl = `${BACKEND_API_URL}${path}${url.search}`;
-  
-  const headers = prepareHeaders(request, accessToken);
-  
+  // ... retry loop implementation ...
+  // 1. Sets up AbortController for timeout
+  // 2. Calls forwardRequest()
+  // 3. Retries on 5xx errors or timeouts
+  // 4. Uses exponential backoff (1s, 2s, etc.)
+}
+```
+
+**Features**:
+- **Retries**: Automatically retries 5xx errors (up to 2 times by default).
+- **Timeout**: Enforces a 30s timeout per attempt.
+- **Backoff**: Waits longer between each retry attempt.
+
+---
+
+### 3. `forwardRequestStreaming()` - File Uploads
+
+**Purpose**: Handles large payloads and file uploads without buffering
+
+```typescript
+async function forwardRequestStreaming(
+  request: NextRequest,
+  path: string,
+  accessToken?: string
+): Promise<Response> {
+  // ...
   const options: RequestInit = {
     method: request.method,
     headers,
+    body: request.body, // Stream directly
+    duplex: "half",     // Required for streaming
   };
-  
-  if (cachedBody !== undefined) {
-    options.body = cachedBody;
-  }
   
   return fetch(backendUrl, options);
 }
 ```
 
-**What It Does**:
-1. Constructs full backend URL from path + query string
-2. Prepares headers (adds Authorization if token exists)
-3. Includes cached body for POST/PUT/PATCH requests
-4. Makes server-to-server fetch to backend
-
-**Why `url.search`?**: Preserves query parameters (e.g., `/api/users?page=2`)
+**Note**: Streaming requests **cannot be automatically retried** if they fail, as the stream is consumed on the first attempt.
 
 ---
 
-### 3. `prepareHeaders()` - Header Management
+### 4. `proxy-utils.ts` - Shared Utilities
 
-```typescript
-function prepareHeaders(request: NextRequest, accessToken?: string): Headers {
-  const headers = new Headers(request.headers);
-  
-  // Add authorization
-  if (accessToken) {
-    headers.set("Authorization", `Bearer ${accessToken}`);
-  }
-  
-  // Forward important headers
-  const userAgent = request.headers.get("user-agent");
-  if (userAgent) {
-    headers.set("user-agent", userAgent);
-  }
-  
-  // Remove problematic headers
-  headers.delete("host");    // Backend has different host
-  headers.delete("cookie");  // Don't forward frontend cookies
-  
-  return headers;
-}
-```
+This file contains reusable logic to keep `route.ts` clean:
 
-**Header Handling**:
-- **Add**: `Authorization` with Bearer token
-- **Preserve**: `user-agent`, `x-forwarded-for` (for IP tracking)
-- **Remove**: `host` (would be frontend host), `cookie` (security)
-
----
-
-### 4. `refreshAccessToken()` - Token Refresh
-
-```typescript
-async function refreshAccessToken(
-  refreshToken: string
-): Promise<RefreshResponse | null> {
-  const response = await fetch(`${BACKEND_API_URL}${REFRESH_ENDPOINT}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${refreshToken}`,
-    },
-  });
-  
-  if (!response.ok) {
-    return null;
-  }
-  
-  return await response.json(); // { access_token, refresh_token }
-}
-```
-
-**Flow**:
-1. Send refresh token to `/auth/refresh` endpoint
-2. Backend validates refresh token
-3. Returns new access + refresh tokens
-4. If fails (401/403), return `null` → user logged out
+- **`prepareHeaders`**: Adds `Authorization`, preserves `user-agent`, removes `host`/`cookie`.
+- **`refreshAccessToken`**: Calls backend to get new tokens.
+- **`createNextResponse`**: Helper to format Next.js responses.
+- **`createStreamingResponse`**: Helper for streaming responses (downloads).
 
 ---
 
@@ -420,69 +391,54 @@ async function handleTokenRefresh(
   refreshToken: string,
   cachedBody?: string
 ): Promise<NextResponse | null> {
-  // Try to refresh
-  const refreshResult = await refreshAccessToken(refreshToken);
+  // 1. Call refreshAccessToken
+  const refreshResult = await refreshAccessToken(...);
   
   if (!refreshResult) {
     // Refresh failed → clear session
-    const errorResponse = NextResponse.json(
-      { error: "Unauthorized - Token refresh failed" },
-      { status: 401 }
-    );
-    errorResponse.cookies.delete(SESSION_TOKEN_COOKIE);
-    return errorResponse;
+    return createErrorResponse("TOKEN_REFRESH_FAILED", ...);
   }
   
-  // Retry original request with new token
-  const response = await forwardRequest(
+  // 2. Retry original request with new token
+  const response = await forwardRequestWithRetry(
     request, 
     fullPath, 
     refreshResult.access_token, 
     cachedBody
   );
   
-  const data = await response.text();
-  const nextResponse = createNextResponse(response, data);
-  
-  // Update session cookie with new tokens
-  await updateSessionCookie(
-    nextResponse,
-    sessionPayload,
-    refreshResult.access_token,
-    refreshResult.refresh_token
+  // 3. Update session cookie with new tokens
+  await setSessionCookie(
+    nextResponse.cookies,
+    { ...sessionPayload, ...newTokens },
+    sessionPayload.rememberMe ? ... : undefined
   );
   
   return nextResponse;
 }
 ```
 
-**Key Points**:
-- **Automatic Retry**: Original request is retried transparently
-- **Cookie Update**: New tokens stored in session cookie
-- **Failure Handling**: If refresh fails, session is cleared (user logged out)
-
 ---
 
 ### 6. `handleSignIn()` - Session Creation
 
 ```typescript
-async function handleSignIn(response: Response): Promise<NextResponse> {
+async function handleSignIn(
+  response: Response, 
+  rememberMe?: boolean
+): Promise<NextResponse> {
+  // 1. Extract data
   const data = await response.json();
-  const nextResponse = createNextResponse(response, JSON.stringify(data));
   
-  const { accessToken, refreshToken, id, email, firstName, lastName } = data;
+  // 2. Create session payload
+  const sessionPayload = { ...data, rememberMe };
   
-  const sessionPayload = {
-    id,
-    email,
-    firstName,
-    lastName,
-    accessToken,
-    refreshToken,
-  };
-  
-  const encryptedSession = await encrypt(sessionPayload);
-  nextResponse.cookies.set(getSessionTokenOption(encryptedSession));
+  // 3. Set Cookie
+  if (rememberMe) {
+    await setSessionCookie(res.cookies, sessionPayload, new Date(Date.now() + 7d));
+  } else {
+    await setSessionCookie(res.cookies, sessionPayload); // Session cookie
+  }
   
   return nextResponse;
 }
@@ -504,7 +460,11 @@ export async function encrypt(payload: SessionPayload) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime(
+      payload.rememberMe 
+        ? new Date(Date.now() + SESSION_EXPIRES_IN) 
+        : new Date(Date.now() + 60 * 60 * 1000)
+    )
     .sign(encodedKey);
 }
 
@@ -523,32 +483,32 @@ export async function decrypt(session: string | undefined = "") {
 **Security**:
 - **Algorithm**: HS256 (HMAC with SHA-256)
 - **Secret**: `SESSION_SECRET` environment variable
-- **Expiration**: 7 days
+- **Expiration**: Dynamic (7 days for rememberMe, 1 hour otherwise)
 - **Storage**: HTTP-only cookie (inaccessible to JavaScript)
 
 ---
 
-### 8. Cookie Configuration (`token.ts`)
+### 8. Cookie Configuration (`session.ts`)
 
 ```typescript
-export const getSessionTokenOption = (sessionPayload: string) => {
+export function getSessionTokenOption(token: string, expires?: Date) {
   return {
-    name: SESSION_TOKEN_COOKIE,      // "session_token"
-    value: sessionPayload,            // Encrypted JWT
-    httpOnly: true,                   // Not accessible via document.cookie
-    secure: process.env.NODE_ENV === "production",  // HTTPS only in prod
-    sameSite: "strict",               // CSRF protection
-    path: "/",                        // Available site-wide
-    maxAge: 7 * 24 * 60 * 60,        // 7 days in seconds
+    name: SESSION_TOKEN_COOKIE,
+    value: token,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    expires,
   };
-};
+}
 ```
 
 **Cookie Flags**:
 - **httpOnly**: Prevents XSS attacks (JS can't read cookie)
 - **secure**: HTTPS only in production
-- **sameSite: strict**: Blocks CSRF attacks (cookie not sent on cross-site requests)
-- **maxAge**: Auto-deletion after 7 days
+- **sameSite: lax**: Balances security and usability (allows top-level navigation)
+- **expires**: Matches the JWT expiration
 
 ---
 
@@ -661,22 +621,15 @@ export const SESSION_TOKEN_COOKIE = "session_token";
 ```typescript
 export async function encrypt(payload: SessionPayload) {
   return new SignJWT(payload)
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("30d")  // Change from 7d to 30d
+    // ...
+    .setExpirationTime("30d")  // Change expiration here
     .sign(encodedKey);
 }
 ```
 
-**In `lib/token.ts`**:
+**In `lib/config.ts`**:
 ```typescript
-export const getSessionTokenOption = (sessionPayload: string) => {
-  return getTokenOptions(
-    SESSION_TOKEN_COOKIE,
-    sessionPayload,
-    30 * 24 * 60 * 60  // Change from 7 days to 30 days
-  );
-};
+export const SESSION_EXPIRES_IN = 30 * 24 * 60 * 60 * 1000; // Update constant
 ```
 
 ---
@@ -1048,11 +1001,10 @@ if (fullPath === "/debug/force-401") {
 
 1. **Connection Pooling**: Node.js `fetch` uses connection pooling by default.
 
-2. **Response Streaming**: For large responses, consider streaming:
-   ```typescript
-   const response = await fetch(backendUrl, options);
-   return new NextResponse(response.body, { status: response.status });
-   ```
+2. **Response Streaming**: **Already Implemented**. The proxy automatically streams:
+   - File uploads (multipart/form-data)
+   - Binary responses (images, PDFs, zips)
+   - Large downloads
 
 3. **Caching**: Add caching for GET requests (see modification #7).
 
@@ -1077,6 +1029,7 @@ describe("Session encryption", () => {
       lastName: "Doe",
       accessToken: "token",
       refreshToken: "refresh",
+      rememberMe: false,
     };
     
     const encrypted = await encrypt(payload);
@@ -1164,8 +1117,8 @@ This API proxy provides:
 
 **Key Files**:
 - `route.ts`: Main proxy logic
-- `session.ts`: JWT encryption/decryption
-- `token.ts`: Cookie configuration
+- `session.ts`: JWT encryption/decryption & cookie configuration
+- `proxy-utils.ts`: Shared proxy utilities
 - `config.ts`: Environment constants
 
 **Modification Strategy**:
