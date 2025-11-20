@@ -555,7 +555,7 @@ sequenceDiagram
     Backend-->>Proxy: 401 Unauthorized<br/>(Token expired)
     deactivate Backend
     
-    rect rgb(255, 243, 224)
+    rect rgb(60, 60, 60)
         Note over Proxy: Token Refresh Flow
         Proxy->>Proxy: Extract refreshToken from session
         Proxy->>Backend: POST /auth/refresh<br/>Authorization: Bearer <refresh_token>
@@ -565,7 +565,7 @@ sequenceDiagram
         deactivate Backend
     end
     
-    rect rgb(232, 245, 233)
+    rect rgb(40, 80, 40)
         Note over Proxy,Backend: Retry Original Request
         Proxy->>Backend: GET /users (RETRY)<br/>Authorization: Bearer <new_token>
         activate Backend
