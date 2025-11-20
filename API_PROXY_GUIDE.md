@@ -198,7 +198,7 @@ flowchart TD
     J --> K[Create SessionPayload]
     K --> L{rememberMe?}
     L -->|Yes| M[Expires in 7 days]
-    L -->|No| N[Expires in 1 day (or browser close)]
+    L -->|No| N[Expires in 1 day, or browser close]
     M --> O[Encrypt & Set Cookie]
     N --> O
     O --> P[Return response to browser]
